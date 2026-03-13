@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+.highlight {
+    background-color: #fef08a;
+    cursor: pointer;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.25rem;
+    transition: all 0.2s;
+}
+.highlight:hover, .highlight.active {
+    background-color: #fde047;
+    box-shadow: 0 0 0 2px #eab308;
+}
+.highlight-resolved {
+    background-color: #bbf7d0;
+}
