@@ -51,14 +51,17 @@ function TeacherDashboard() {
             <div className="grid grid-cols-3 gap-6 mb-10">
               <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition">
                 <p className="text-gray-500 text-sm font-medium mb-1">Active Students</p>
+                {/* [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/teacher/overview */}
                 <h3 className="text-3xl font-bold text-gray-900">42</h3>
               </div>
               <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition">
                 <p className="text-gray-500 text-sm font-medium mb-1">Average Fact-Check Score</p>
+                {/* [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/teacher/overview */}
                 <h3 className="text-3xl font-bold text-green-600">86%</h3>
               </div>
               <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition">
                 <p className="text-gray-500 text-sm font-medium mb-1">Generated Tasks</p>
+                {/* [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/teacher/overview */}
                 <h3 className="text-3xl font-bold text-violet-600">12</h3>
               </div>
             </div>
@@ -71,6 +74,7 @@ function TeacherDashboard() {
                   Upload your study materials, and let AI generate an essay with subtle logical fallacies or hallucinations. Adjust the error density to fit your students' level.
                 </p>
               </div>
+              {/* [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/teacher/tasks (title/subject/sourceText/errorDensity) */}
               <button className="bg-white text-violet-700 px-6 py-3 rounded-xl font-bold shadow-sm hover:bg-gray-50 hover:shadow transition flex items-center gap-2">
                 <UploadSimple size={20} weight="bold" /> Upload Material
               </button>

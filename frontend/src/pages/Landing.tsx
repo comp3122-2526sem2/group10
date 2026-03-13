@@ -26,16 +26,16 @@ function Landing() {
         </div>
 
         {/* Action Side */}
-        <div className="p-10 md:w-1/2 flex flex-col justify-center bg-white">
+        <div className="p-12 md:w-1/2 flex flex-col justify-center bg-white">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h2>
-          <p className="text-gray-500 mb-6">Choose your portal to continue.</p>
+          <p className="text-gray-500 mb-8">Choose your portal to continue.</p>
 
           <div className="space-y-4">
             <button 
-              onClick={() => navigate('/student/dashboard')}
+              onClick={() => navigate('/auth?role=student')}
               className="w-full flex items-center p-4 border border-gray-200 rounded-2xl hover:border-violet-600 hover:bg-violet-50 transition-all shadow-sm hover:shadow-md group"
             >
-              <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center mr-4 group-hover:bg-violet-600 group-hover:text-white transition-colors shrink-0">
+              <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center mr-4 group-hover:bg-violet-600 group-hover:text-white transition-colors">
                 <Student size={24} weight="fill" />
               </div>
               <div className="text-left">
@@ -45,10 +45,10 @@ function Landing() {
             </button>
 
             <button 
-              onClick={() => navigate('/teacher/dashboard')}
+              onClick={() => navigate('/auth?role=teacher')}
               className="w-full flex items-center p-4 border border-gray-200 rounded-2xl hover:border-violet-600 hover:bg-violet-50 transition-all shadow-sm hover:shadow-md group"
             >
-              <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center mr-4 group-hover:bg-violet-600 group-hover:text-white transition-colors shrink-0">
+              <div className="w-12 h-12 bg-violet-100 text-violet-600 rounded-xl flex items-center justify-center mr-4 group-hover:bg-violet-600 group-hover:text-white transition-colors">
                 <ChalkboardTeacher size={24} weight="fill" />
               </div>
               <div className="text-left">
@@ -58,10 +58,10 @@ function Landing() {
             </button>
 
             <button 
-              onClick={() => navigate('/admin/dashboard')}
+              onClick={() => navigate('/auth?role=admin')}
               className="w-full flex items-center p-4 border border-gray-200 rounded-2xl hover:border-violet-600 hover:bg-violet-50 transition-all shadow-sm hover:shadow-md group"
             >
-              <div className="w-12 h-12 bg-gray-100 text-gray-600 rounded-xl flex items-center justify-center mr-4 group-hover:bg-violet-600 group-hover:text-white transition-colors shrink-0">
+              <div className="w-12 h-12 bg-gray-100 text-gray-600 rounded-xl flex items-center justify-center mr-4 group-hover:bg-violet-600 group-hover:text-white transition-colors">
                 <ShieldCheck size={24} weight="fill" />
               </div>
               <div className="text-left">

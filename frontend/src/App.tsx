@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Landing from './pages/Landing';
+import AuthPage from './pages/Auth';
 import StudentDashboard from './pages/student/Dashboard';
 import Workspace from './pages/student/Workspace';
 import TeacherDashboard from './pages/teacher/Dashboard';
@@ -10,6 +11,7 @@ function App() {
       <Routes>
         {/* Public Route */}
         <Route path="/" element={<Landing />} />
+        <Route path="/auth" element={<AuthPage />} />
 
         {/* Student Routes */}
         <Route path="/student/dashboard" element={<StudentDashboard />} />
