@@ -1,8 +1,16 @@
+import { useState } from 'react';
 import { Target, UserCircle, UploadSimple, ChalkboardTeacher, ChartBar, Gear } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 
 function TeacherDashboard() {
   const navigate = useNavigate();
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  const handleLogout = () => {
+    // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/auth/logout
+    localStorage.removeItem('token');
+    navigate('/auth');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800 flex flex-col">
@@ -13,7 +21,21 @@ function TeacherDashboard() {
           <h1 className="text-xl font-bold text-gray-900">Debunk AI</h1>
         </div>
         <div className="flex items-center gap-6">
-          <UserCircle size={32} className="text-gray-400 hover:text-violet-600 cursor-pointer transition" />
+          <div className="relative">
+            <button onClick={() => setProfileOpen((v) => !v)} className="text-gray-400 hover:text-violet-600 cursor-pointer transition">
+              <UserCircle size={32} />
+            </button>
+            {profileOpen && (
+              <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-200 rounded-xl shadow-md py-1 z-20">
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

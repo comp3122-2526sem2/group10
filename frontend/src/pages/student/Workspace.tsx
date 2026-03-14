@@ -15,6 +15,7 @@ function Workspace() {
   const [errorType, setErrorType] = useState("Logical Error");
   const [resolved, setResolved] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     fetchStudentTaskDetail(taskId)
@@ -33,6 +34,12 @@ function Workspace() {
       return acc;
     }, {}) ?? {};
   }, [taskDetail]);
+
+  const handleLogout = () => {
+    // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/auth/logout
+    localStorage.removeItem('token');
+    navigate('/auth');
+  };
 
   const handleSubmit = async () => {
     if (selectedHighlight !== null && !resolved.includes(selectedHighlight)) {
@@ -93,7 +100,21 @@ function Workspace() {
         </div>
         
         <div className="flex items-center justify-end gap-4 w-1/3">
-          <UserCircle size={32} className="text-gray-400 hover:text-violet-600 cursor-pointer transition" />
+          <div className="relative">
+            <button onClick={() => setProfileOpen((v) => !v)} className="text-gray-400 hover:text-violet-600 cursor-pointer transition">
+              <UserCircle size={32} />
+            </button>
+            {profileOpen && (
+              <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-200 rounded-xl shadow-md py-1 z-20">
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

@@ -6,6 +6,7 @@ import { fetchPendingTasks, type TaskItem } from '../../api/mock';
 function StudentDashboard() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/student/tasks?status=pending
@@ -13,6 +14,12 @@ function StudentDashboard() {
       console.error('Failed to fetch pending tasks', error);
     });
   }, []);
+
+  const handleLogout = () => {
+    // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/auth/logout
+    localStorage.removeItem('token');
+    navigate('/auth');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
@@ -28,7 +35,21 @@ function StudentDashboard() {
             {/* [API_TODO] REPLACE_WITH_REAL_API: points 来自 GET /api/v1/auth/me */}
             <span className="font-bold text-gray-700">120 pts</span>
           </div>
-          <UserCircle size={32} className="text-gray-400 hover:text-violet-600 cursor-pointer transition" />
+          <div className="relative">
+            <button onClick={() => setProfileOpen((v) => !v)} className="text-gray-400 hover:text-violet-600 cursor-pointer transition">
+              <UserCircle size={32} />
+            </button>
+            {profileOpen && (
+              <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-200 rounded-xl shadow-md py-1 z-20">
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
