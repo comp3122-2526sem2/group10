@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Target, UserCircle, Robot, PencilSimpleLine, X, CaretDown, CheckCircle, CursorText, ArrowLeft, Spinner } from '@phosphor-icons/react';
+import { Target, UserCircle, Robot, PencilSimpleLine, X, CaretDown, CheckCircle, CursorText, ArrowLeft, Spinner, Star } from '@phosphor-icons/react';
 import { useNavigate, useParams } from 'react-router-dom';
+import confetti from 'canvas-confetti';
 import { fetchStudentTaskDetail, submitAnnotation, type StudentTaskDetail } from '../../api/mock';
 
 function Workspace() {
@@ -14,6 +15,7 @@ function Workspace() {
   const [annotation, setAnnotation] = useState("");
   const [errorType, setErrorType] = useState("Logical Error");
   const [resolved, setResolved] = useState<number[]>([]);
+  const [resolvedData, setResolvedData] = useState<Record<number, { isGolden: boolean, points: number, message: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -59,8 +61,26 @@ function Workspace() {
 
         // 更新前端状态
         setResolved([...resolved, selectedHighlight]);
+        setResolvedData(prev => ({
+          ...prev,
+          [selectedHighlight]: {
+            isGolden: response.isGolden || false,
+            points: response.pointsEarned,
+            message: response.message
+          }
+        }));
         setFoundErrors(prev => Math.min(prev + 1, totalErrors));
         setAnnotation("");
+
+        // 如果是隐藏彩蛋，播放撒花动画
+        if (response.isGolden) {
+          confetti({
+            particleCount: 150,
+            spread: 80,
+            origin: { y: 0.6 },
+            colors: ['#FFD700', '#FFA500', '#FF8C00'] // 金色系
+          });
+        }
       } catch (error) {
         console.error("Failed to submit annotation", error);
       } finally {
@@ -136,9 +156,12 @@ function Workspace() {
               </p>
               <p>
                 During World War II, Alan Turing proposed the concept of the "Turing Machine" and successfully cracked the German Enigma machine.{' '}
+                {/* 隐藏的彩蛋（Golden Hallucination），没有任何视觉提示，只有 hover 或选中时才会有变化，甚至只有选中才会知道。
+                    这里移除传统的 highlight 类名，使用普通文本配合极轻微的交互，让它“看起来完全不像个错误”。 */}
                 <span 
-                  className={`highlight ${selectedHighlight === 1 && !resolved.includes(1) ? 'active' : ''} ${resolved.includes(1) ? 'highlight-resolved' : ''}`}
+                  className={`cursor-text transition-colors duration-300 ${selectedHighlight === 1 && !resolved.includes(1) ? 'bg-violet-100 text-violet-900 rounded px-1' : ''} ${resolved.includes(1) ? 'text-yellow-600 font-medium' : ''}`}
                   onClick={() => setSelectedHighlight(1)}
+                  title="Click to anaylze this sentence"
                 >
                   Subsequently in 1950, Turing invented the world's first personal smartphone, which greatly promoted the development of the mobile internet.
                 </span>{' '}
@@ -224,12 +247,27 @@ function Workspace() {
               </button>
             </div>
           ) : resolved.includes(selectedHighlight as number) ? (
-            <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 gap-3">
-              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-green-500 mb-2">
-                <CheckCircle weight="fill" size={36} />
-              </div>
-              <p className="font-medium text-gray-700">Successfully debunked this error!</p>
-              <p className="text-sm">+1 Point, Great job!</p>
+            <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 gap-3 animate-fade-in-up">
+              {resolvedData[selectedHighlight as number]?.isGolden ? (
+                <>
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-yellow-200 to-yellow-500 flex items-center justify-center text-white mb-2 shadow-lg scale-[1.1]">
+                    <Star weight="fill" size={42} />
+                  </div>
+                  <h3 className="font-bold text-xl text-yellow-600">Golden Hallucination!</h3>
+                  <p className="font-medium text-gray-700">{resolvedData[selectedHighlight as number]?.message}</p>
+                  <p className="text-sm font-bold text-yellow-600 bg-yellow-50 border border-yellow-200 px-4 py-2 rounded-full mt-2">
+                    +{resolvedData[selectedHighlight as number]?.points} Points
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-green-500 mb-2">
+                    <CheckCircle weight="fill" size={36} />
+                  </div>
+                  <p className="font-medium text-gray-700">{resolvedData[selectedHighlight as number]?.message || 'Successfully debunked this error!'}</p>
+                  <p className="text-sm font-medium text-green-600">+{resolvedData[selectedHighlight as number]?.points || 1} Point, Great job!</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 gap-4">

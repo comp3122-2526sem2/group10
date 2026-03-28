@@ -90,6 +90,7 @@ export interface AnnotationResponse {
   isCorrect: boolean;
   aiFeedback: string;
   message: string;
+  isGolden?: boolean;
 }
 
 /**
@@ -103,12 +104,17 @@ export const submitAnnotation = async (payload: AnnotationPayload): Promise<Anno
   // 模拟网络请求和 AI 处理延迟
   return new Promise((resolve) => {
     setTimeout(() => {
+      // 设定 highlightId 1 作为一个“黄金幻觉”彩蛋
+      const isGolden = payload.highlightId === 1;
       resolve({
         success: true,
-        pointsEarned: 1,
+        pointsEarned: isGolden ? 15 : 5, // 找到 Golden Hallucination 得 3 倍分
         isCorrect: true,
         aiFeedback: 'Excellent logic! You successfully spotted the hardware illusion.',
-        message: "Successfully debunked the AI hallucination!"
+        message: isGolden 
+          ? "🎉 You hit the Golden Hallucination! Triple Points Awarded!" 
+          : "Successfully debunked the AI hallucination!",
+        isGolden
       });
     }, 800);
   });
