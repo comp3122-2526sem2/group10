@@ -123,6 +123,18 @@ export const submitAnnotation = async (payload: AnnotationPayload): Promise<Anno
 
 // --- 教师端 API (Teacher API) ---
 
+export interface BlindspotData {
+  text: string;
+  errorType: string;
+  missRate: number; // 0-1 的小数值，代表有多少学生**没发现**这个错误
+}
+
+export interface InsightReport {
+  taskId: string;
+  title: string;
+  blindspots: BlindspotData[];
+}
+
 /**
  * 3. 获取教师面板统计数据
  * API: GET /api/v1/teacher/overview
@@ -138,5 +150,38 @@ export const fetchTeacherOverviewStats = async () => {
         generatedTasks: 12
       });
     }, 500);
+  });
+};
+
+/**
+ * 4. 获取班级盲区热力图报告
+ * API: GET /api/v1/teacher/reports/:taskId/heatmaps
+ */
+export const fetchBlindspotHeatmap = async (): Promise<InsightReport> => {
+  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/teacher/reports/:taskId/heatmaps
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        taskId: "task-1",
+        title: "A Brief History of Computer Science",
+        blindspots: [
+          {
+            text: "Subsequently in 1950, Turing invented the world's first personal smartphone...",
+            errorType: "Golden Hallucination",
+            missRate: 0.85 // 85%的学生都没发现，高危盲区，深红
+          },
+          {
+            text: "Because the serial computing power of GPUs is much lower than CPUs, deep learning...",
+            errorType: "Logical Error",
+            missRate: 0.30 // 30%的学生没发现，中低盲区，浅红/黄
+          },
+          {
+            text: "The internet was invented by Albert Einstein in 1980.",
+            errorType: "Factual Error",
+            missRate: 0.05 // 大家都能找出来，安全，绿色
+          }
+        ]
+      });
+    }, 600);
   });
 };
