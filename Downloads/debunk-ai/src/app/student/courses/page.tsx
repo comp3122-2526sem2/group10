@@ -19,10 +19,10 @@ export default async function StudentCoursesPage() {
   return (
     <div className="space-y-6">
       <form action={joinCourse} className="rounded-3xl border border-white/10 bg-white/5 p-5">
-        <div className="text-lg font-semibold">加入课程</div>
+        <div className="text-lg font-semibold">Join a Course</div>
         <div className="mt-3 flex flex-col gap-3 md:flex-row">
-          <input name="inviteCode" placeholder="输入邀请码，例如 ABCD1234" className="flex-1 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white" />
-          <button className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-semibold text-white">加入</button>
+          <input name="inviteCode" placeholder="Enter invite code (e.g., DEBUNK01)" className="flex-1 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white" />
+          <button className="rounded-2xl bg-cyan-600 px-5 py-3 text-sm font-semibold text-white">Join</button>
         </div>
       </form>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -21,11 +21,11 @@ export default async function StudentMistakesPage() {
           <input type="hidden" name="id" value={mistake.id} />
           <div className="text-xs uppercase tracking-[0.3em] text-cyan-300">{mistake.entryType}</div>
           <div className="mt-2 text-xl font-semibold">{mistake.submission.task.title}</div>
-          <textarea name="note" defaultValue={mistake.personalNotes || ''} placeholder="写下你下次要如何避免这个错误..." className="mt-4 min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white" />
-          <button className="mt-3 rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-semibold text-white">保存笔记</button>
+          <textarea name="note" defaultValue={mistake.personalNotes || ''} placeholder="How will you avoid this error next time?" className="mt-4 min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white" />
+          <button className="mt-3 rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-semibold text-white">Save Note</button>
         </form>
       ))}
-      {mistakes.length === 0 ? <div className="rounded-3xl border border-dashed border-white/10 p-6 text-sm text-slate-400">暂时没有错题记录，继续完成更多任务吧。</div> : null}
+      {mistakes.length === 0 ? <div className="rounded-3xl border border-dashed border-white/10 p-6 text-sm text-slate-400">No mistakes recorded yet. Complete more tasks to build up your error journal.</div> : null}
     </div>
   );
 }
