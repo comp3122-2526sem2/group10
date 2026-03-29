@@ -58,8 +58,9 @@ NODE_ENV=production
    ```
 
 **How it works:**
-- If `HF_API_KEY` is set, the app uses real HuggingFace Mistral model for content generation
-- If not set, it falls back to demo mode with deterministic content (for testing)
+- The app uses real HuggingFace Mistral-7B model for Socratic hints, chat responses, and educational guidance
+- HF_API_KEY is required for production deployment; the app will warn if not configured
+- Pre-populated courses, tasks, and sample submissions provide realistic test data without relying on computed demo content
 
 ### 4. Database Setup
 

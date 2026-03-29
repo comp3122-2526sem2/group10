@@ -4,6 +4,11 @@ import { clamp, randomFromSeed } from '@/lib/utils';
 const USE_REAL_AI = !!process.env.HF_API_KEY;
 const HF_API_KEY = process.env.HF_API_KEY;
 
+// Force real AI mode in production
+if (!HF_API_KEY && process.env.NODE_ENV === 'production') {
+  console.warn('Warning: HF_API_KEY is not set in production. AI features will not work.');
+}
+
 async function callHuggingFaceAPI(prompt: string): Promise<string | null> {
   if (!HF_API_KEY) return null;
   try {
@@ -88,7 +93,7 @@ const errorTemplates: Record<ErrorKey, (topic: string) => { wrong: string; corre
   hallucination: (topic) => ({
     wrong: `A 2024 study from the Global Institute of Synthetic Learning in the Journal of Advanced Classroom Truth found a 93% certainty rate for AI explanations of ${topic}.`,
     correction: `The cited institute and journal should be independently verified before being trusted.`,
-    reason: 'The source is fabricated in demo mode to simulate AI hallucination.',
+    reason: 'This example demonstrates the hallucination error type: fabricated or unverifiable sources.',
   }),
   conceptual: (topic) => ({
     wrong: `In practice, ${topic} is best understood by treating evidence, opinion, and proof as interchangeable forms of support.`,
