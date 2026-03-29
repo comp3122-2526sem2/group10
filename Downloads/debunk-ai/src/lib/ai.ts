@@ -198,7 +198,7 @@ export function gradeSubmission(answerKey: AnswerKeyItem[], annotations: Annotat
       matchStatus: 'true_positive',
       classificationCorrect: annotation.errorType === hit.errorType,
       explanationQuality,
-      feedback: annotation.errorType === hit.errorType ? 'You caught a real error with correct classification.' : `Error found, but the more appropriate type is ${hit.errorType}`.`,
+      feedback: annotation.errorType === hit.errorType ? 'You caught a real error with correct classification.' : `Error found, but the more appropriate type is ${hit.errorType}`,
       expectedType: hit.errorType,
     };
   });
