@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Target, UserCircle, Files, Star, ArrowRight } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
-import { fetchPendingTasks, type TaskItem } from '../../api/mock';
+import { fetchPendingTasks, fetchStudentProfile, type TaskItem, type StudentProfile } from '../../api/mock';
 
 function StudentDashboard() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
+    fetchStudentProfile().then(setProfile).catch(console.error);
+
     // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/student/tasks?status=pending
     fetchPendingTasks().then(setTasks).catch((error) => {
       console.error('Failed to fetch pending tasks', error);
@@ -32,8 +35,7 @@ function StudentDashboard() {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <Star weight="fill" className="text-yellow-400 text-xl" />
-            {/* [API_TODO] REPLACE_WITH_REAL_API: points 来自 GET /api/v1/auth/me */}
-            <span className="font-bold text-gray-700">120 pts</span>
+            <span className="font-bold text-gray-700">{profile ? profile.points : '...'} pts</span>
           </div>
           <div className="relative">
             <button onClick={() => setProfileOpen((v) => !v)} className="text-gray-400 hover:text-violet-600 cursor-pointer transition">
@@ -55,8 +57,7 @@ function StudentDashboard() {
 
       <main className="max-w-5xl mx-auto p-10">
         <section className="mb-10">
-          {/* [API_TODO] REPLACE_WITH_REAL_API: name 来自 GET /api/v1/auth/me */}
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back, Jason! 👋</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back, {profile?.name || 'Student'}! 👋</h2>
           <p className="text-gray-500">Ready to track down some AI hallucinations?</p>
         </section>
 

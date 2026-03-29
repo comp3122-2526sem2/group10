@@ -13,6 +13,28 @@ export interface TaskItem {
   status: 'pending' | 'completed';
 }
 
+export interface StudentProfile {
+  name: string;
+  points: number;
+}
+
+/**
+ * 0. 获取学生个人信息
+ * API: GET /api/v1/student/me
+ */
+export const fetchStudentProfile = async (): Promise<StudentProfile> => {
+  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/student/me
+  console.log("[Mock API] Fetching student profile... GET /api/v1/student/me");
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        name: 'Jason',
+        points: 120
+      });
+    }, 300);
+  });
+};
+
 /**
  * 1. 获取学生的待办任务列表
  * API: GET /api/v1/student/tasks?status=pending
@@ -182,6 +204,140 @@ export const fetchBlindspotHeatmap = async (): Promise<InsightReport> => {
           }
         ]
       });
+    }, 600);
+  });
+};
+
+/**
+ * 5. 教师获取最近的发布任务列表
+ * API: GET /api/v1/teacher/tasks
+ */
+export const fetchRecentTasks = async (): Promise<any[]> => {
+  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/teacher/tasks
+  console.log("[Mock API] Fetching recent tasks... GET /api/v1/teacher/tasks");
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve([
+        { id: 'task-1', title: 'A Brief History of Computer Science', subject: 'Computer Science', completion: 85 },
+        { id: 'task-2', title: 'The Industrial Revolution (AI Draft)', subject: 'World History', completion: 40 },
+      ]);
+    }, 500);
+  });
+};
+
+/**
+ * 6. 生成包含幻觉的文本
+ * API: POST /api/v1/teacher/generate-flaws
+ */
+export const generateFlawedText = async (payload: { sourceText: string; density: number }) => {
+  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/teacher/generate-flaws
+  console.log("[Mock API] Generating flawed text...", payload);
+  return new Promise<string>((resolve) => {
+    setTimeout(() => {
+      resolve("With the advent of the 21st century, artificial intelligence experienced explosive growth. \n\nThe breakthrough of deep learning technology relies on two factors: massive data and powerful computing capabilities. Because the serial computing power of GPUs (Graphics Processing Units) is much lower than CPUs, deep learning training relies completely on modern high-performance CPU clusters. This makes complex systems like large language models possible.\n\nIn conclusion, although modern computing architectures are increasingly complex, their underlying logic still relies on the foundations laid by Turing and von Neumann over half a century ago.");
+    }, 1500);
+  });
+};
+
+/**
+ * 7. 发布任务
+ * API: POST /api/v1/teacher/tasks
+ */
+export const publishTask = async (payload: { title: string; content: string; subject: string }) => {
+  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/teacher/tasks
+  console.log("[Mock API] Publishing task...", payload);
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ success: true, taskId: `task-${Date.now()}` });
+    }, 800);
+  });
+};
+
+
+// --- 管理员 API (Admin API) ---
+
+export interface Classroom {
+  id: string;
+  name: string;
+  code: string;
+  enrolled: number;
+}
+
+/**
+ * 8. 获取系统所有班级
+ * API: GET /api/v1/admin/classrooms
+ */
+export const fetchClassrooms = async (): Promise<Classroom[]> => {
+  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/admin/classrooms
+  console.log("[Mock API] Fetching classrooms... GET /api/v1/admin/classrooms");
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve([
+        { id: 'class-cs101', name: 'Computer Science 101', code: 'CS-101-FALL', enrolled: 42 },
+        { id: 'class-hist202', name: 'World History - AI Era', code: 'WH-202-SPRG', enrolled: 128 },
+        { id: 'class-phys101', name: 'Physics & Computing', code: 'PH-101-FALL', enrolled: 85 },
+      ]);
+    }, 400);
+  });
+};
+
+/**
+ * 9. 创建新班级
+ * API: POST /api/v1/admin/classrooms
+ */
+export const createClassroom = async (payload: { name: string }): Promise<Classroom> => {
+  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/admin/classrooms
+  console.log("[Mock API] Creating classroom...", payload);
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({
+        id: `class-${Date.now()}`,
+        name: payload.name,
+        code: `CODE-${Math.floor(Math.random() * 10000)}`,
+        enrolled: 0
+      });
+    }, 600);
+  });
+};
+
+/**
+ * 10. 为班级添加教师
+ * API: POST /api/v1/admin/classrooms/:classId/teachers
+ */
+export const assignTeacherToClassroom = async (classId: string, email: string) => {
+  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/admin/classrooms/:classId/teachers
+  console.log(`[Mock API] Assigning ${email} to classroom ${classId}...`);
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ success: true });
+    }, 500);
+  });
+};
+
+/**
+ * 11. 刷新班级邀请码
+ * API: POST /api/v1/admin/classrooms/:classId/refresh-code
+ */
+export const refreshClassroomCode = async (classId: string): Promise<string> => {
+  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/admin/classrooms/:classId/refresh-code
+  console.log(`[Mock API] Refreshing code for classroom ${classId}...`);
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(`NEWCD-${Math.floor(Math.random() * 10000)}`);
+    }, 400);
+  });
+};
+
+/**
+ * 12. 批量邀请学生
+ * API: POST /api/v1/admin/classrooms/:classId/students/invite
+ */
+export const inviteStudents = async (classId: string, emails: string[]) => {
+  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/admin/classrooms/:classId/students/invite
+  console.log(`[Mock API] Inviting ${emails.length} students to classroom ${classId}...`);
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ success: true, count: emails.length });
     }, 600);
   });
 };

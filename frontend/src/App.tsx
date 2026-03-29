@@ -4,6 +4,7 @@ import AuthPage from './pages/Auth';
 import StudentDashboard from './pages/student/Dashboard';
 import Workspace from './pages/student/Workspace';
 import TeacherDashboard from './pages/teacher/Dashboard';
+import AdminDashboard from './pages/admin/Dashboard';
 
 function App() {
   return (
@@ -19,6 +20,9 @@ function App() {
 
         {/* Teacher Routes */}
         <Route path="/teacher/dashboard" element={<TeacherDashboard />} />
+
+        {/* Admin Routes */}
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
       </Routes>
     </Router>
   );

@@ -1,19 +1,33 @@
 import { useState, useEffect } from 'react';
 import { Target, UserCircle, UploadSimple, ChalkboardTeacher, ChartBar, Flame, WarningCircle, Robot, TestTube, Spinner } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
-import { fetchBlindspotHeatmap, type InsightReport } from '../../api/mock';
+import { 
+  fetchBlindspotHeatmap, 
+  fetchTeacherOverviewStats, 
+  fetchRecentTasks, 
+  generateFlawedText,
+  publishTask,
+  type InsightReport 
+} from '../../api/mock';
 
 function TeacherDashboard() {
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const [heatmapData, setHeatmapData] = useState<InsightReport | null>(null);
+  const [overviewStats, setOverviewStats] = useState<any>(null);
+  const [recentTasks, setRecentTasks] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'generation' | 'analytics'>('overview');
+  
+  const [sourceText, setSourceText] = useState("");
   const [hallucinationDensity, setHallucinationDensity] = useState(2); // 1-3
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedText, setGeneratedText] = useState("");
+  const [isPublishing, setIsPublishing] = useState(false);
 
   useEffect(() => {
     fetchBlindspotHeatmap().then(setHeatmapData);
+    fetchTeacherOverviewStats().then(setOverviewStats);
+    fetchRecentTasks().then(setRecentTasks);
   }, []);
 
   const handleLogout = () => {
@@ -22,13 +36,28 @@ function TeacherDashboard() {
     navigate('/auth');
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    if (!sourceText.trim()) return alert("Please enter source material!");
     setIsGenerating(true);
-    // 模拟等待后端接口生成结果
-    setTimeout(() => {
-      setGeneratedText("With the advent of the 21st century, artificial intelligence experienced explosive growth. \n\nThe breakthrough of deep learning technology relies on two factors: massive data and powerful computing capabilities. Because the serial computing power of GPUs (Graphics Processing Units) is much lower than CPUs, deep learning training relies completely on modern high-performance CPU clusters. This makes complex systems like large language models possible.\n\nIn conclusion, although modern computing architectures are increasingly complex, their underlying logic still relies on the foundations laid by Turing and von Neumann over half a century ago.");
+    try {
+      const res = await generateFlawedText({ sourceText, density: hallucinationDensity });
+      setGeneratedText(res);
+    } finally {
       setIsGenerating(false);
-    }, 1500);
+    }
+  };
+
+  const handlePublish = async () => {
+    setIsPublishing(true);
+    try {
+      await publishTask({ title: "New Fact-check Task", content: generatedText, subject: "General" });
+      alert("Mock: Task published successfully!");
+      setGeneratedText("");
+      setSourceText("");
+      setActiveTab("overview");
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   return (
@@ -91,18 +120,15 @@ function TeacherDashboard() {
                 <div className="grid grid-cols-3 gap-6 mb-10">
                   <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition">
                     <p className="text-gray-500 text-sm font-medium mb-1">Active Students</p>
-                    {/* [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/teacher/overview */}
-                    <h3 className="text-3xl font-bold text-gray-900">42</h3>
+                    <h3 className="text-3xl font-bold text-gray-900">{overviewStats?.activeStudents || 0}</h3>
                   </div>
                   <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition">
                     <p className="text-gray-500 text-sm font-medium mb-1">Average Fact-Check Score</p>
-                    {/* [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/teacher/overview */}
-                    <h3 className="text-3xl font-bold text-green-600">86%</h3>
+                    <h3 className="text-3xl font-bold text-green-600">{overviewStats?.avgFactCheckScore || 0}%</h3>
                   </div>
                   <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition">
                     <p className="text-gray-500 text-sm font-medium mb-1">Generated Tasks</p>
-                    {/* [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/teacher/overview */}
-                    <h3 className="text-3xl font-bold text-violet-600">12</h3>
+                    <h3 className="text-3xl font-bold text-violet-600">{overviewStats?.generatedTasks || 0}</h3>
                   </div>
                 </div>
 
@@ -119,36 +145,23 @@ function TeacherDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      <tr className="hover:bg-gray-50 transition">
-                        <td className="p-4 font-medium text-gray-900">A Brief History of Computer Science</td>
-                        <td className="p-4 text-gray-500">Computer Science</td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div className="bg-green-500 h-full w-[85%]"></div>
+                      {recentTasks.map(task => (
+                        <tr key={task.id} className="hover:bg-gray-50 transition">
+                          <td className="p-4 font-medium text-gray-900">{task.title}</td>
+                          <td className="p-4 text-gray-500">{task.subject}</td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div className={`h-full ${task.completion >= 80 ? 'bg-green-500' : task.completion >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${task.completion}%` }}></div>
+                              </div>
+                              <span className="text-sm text-gray-600">{task.completion}%</span>
                             </div>
-                            <span className="text-sm text-gray-600">85%</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-right">
-                          <button onClick={() => setActiveTab('analytics')} className="text-violet-600 font-medium hover:text-violet-800 transition">View Insights</button>
-                        </td>
-                      </tr>
-                      <tr className="hover:bg-gray-50 transition">
-                        <td className="p-4 font-medium text-gray-900">The Industrial Revolution (AI Draft)</td>
-                        <td className="p-4 text-gray-500">World History</td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                              <div className="bg-green-500 h-full w-[40%]"></div>
-                            </div>
-                            <span className="text-sm text-gray-600">40%</span>
-                          </div>
-                        </td>
-                        <td className="p-4 text-right">
-                          <button onClick={() => setActiveTab('analytics')} className="text-violet-600 font-medium hover:text-violet-800 transition">View Insights</button>
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="p-4 text-right">
+                            <button onClick={() => setActiveTab('analytics')} className="text-violet-600 font-medium hover:text-violet-800 transition">View Insights</button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -166,6 +179,8 @@ function TeacherDashboard() {
                   <div className="flex-1">
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Source Material</label>
                     <textarea 
+                      value={sourceText}
+                      onChange={(e) => setSourceText(e.target.value)}
                       className="w-full h-80 bg-gray-50 border border-gray-200 rounded-xl p-4 outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 resize-none transition"
                       placeholder="Paste your original text or course notes here... The AI will use this as a baseline to insert hallucinations."
                     ></textarea>
@@ -229,8 +244,12 @@ function TeacherDashboard() {
                       >
                         Discard
                       </button>
-                      <button className="px-6 py-2.5 rounded-xl font-semibold bg-violet-600 text-white hover:bg-violet-700 shadow-sm transition">
-                        Publish to Students
+                      <button 
+                        onClick={handlePublish}
+                        disabled={isPublishing}
+                        className={`px-6 py-2.5 rounded-xl font-semibold bg-violet-600 text-white hover:bg-violet-700 shadow-sm transition flex items-center gap-2 ${isPublishing && 'opacity-75'}`}
+                      >
+                        {isPublishing ? <Spinner className="animate-spin" /> : null} Publish to Students
                       </button>
                     </div>
                   </div>
@@ -301,7 +320,6 @@ function TeacherDashboard() {
                 </section>
               </>
             )}
-
           </div>
         </main>
       </div>
