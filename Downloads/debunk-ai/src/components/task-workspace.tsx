@@ -110,31 +110,31 @@ export function TaskWorkspace({ taskId, mode, content, meta, existingAnnotations
       </div>
       <div className="space-y-4">
         <div className="rounded-3xl border border-slate-200 bg-white p-4">
-          <div className="mb-3 text-sm font-semibold text-slate-900">新建标注</div>
-          <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">{selection ? selection.text : '先在左侧选中一段文字。'}</div>
+          <div className="mb-3 text-sm font-semibold text-slate-900">New Annotation</div>
+          <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">{selection ? selection.text : 'Select text from the left to annotate.'}</div>
           <div className="mt-3 space-y-3">
             <select value={errorType} onChange={(e) => setErrorType(e.target.value as keyof typeof errorTypeMap)} className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-slate-900">
               {Object.entries(errorTypeMap).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}
             </select>
-            <textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} rows={4} placeholder="写出你认为它错在哪里，以及正确说法。" className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-slate-900" />
+            <textarea value={explanation} onChange={(e) => setExplanation(e.target.value)} rows={4} placeholder="Explain why this is an error and provide the correct version." className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-slate-900" />
             <div>
               <div className="mb-1 text-xs text-slate-500">Confidence: {confidence}</div>
               <input type="range" min={0} max={100} value={confidence} onChange={(e) => setConfidence(Number(e.target.value))} className="w-full" />
             </div>
-            <button onClick={addAnnotation} className="w-full rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-semibold text-white">保存标注</button>
+            <button onClick={addAnnotation} className="w-full rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-semibold text-white">Save Annotation</button>
           </div>
         </div>
         <div className="rounded-3xl border border-slate-200 bg-white p-4">
           <div className="mb-3 flex items-center justify-between">
-            <div className="text-sm font-semibold text-slate-900">已标注 {annotations.length} 条</div>
-            <button onClick={submitTask} disabled={saving || annotations.length === 0} className="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{saving ? '提交中...' : '提交评分'}</button>
+            <div className="text-sm font-semibold text-slate-900">{annotations.length} Annotations</div>
+            <button onClick={submitTask} disabled={saving || annotations.length === 0} className="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">{saving ? 'Submitting...' : 'Submit for Review'}</button>
           </div>
           <div className="space-y-3">
             {annotations.map((item) => (
               <div key={item.id} className="rounded-2xl border border-slate-200 p-3 text-sm text-slate-700">
                 <div className="mb-1 flex items-center justify-between gap-3">
                   <span className={`rounded-full px-2 py-1 text-xs font-medium ${errorTypeMap[item.errorType].color}`}>{errorTypeMap[item.errorType].label}</span>
-                  <button onClick={() => setAnnotations((prev) => prev.filter((row) => row.id !== item.id))} className="text-xs text-rose-600">删除</button>
+                  <button onClick={() => setAnnotations((prev) => prev.filter((row) => row.id !== item.id))} className="text-xs text-rose-600">Delete</button>
                 </div>
                 <div className="font-medium text-slate-900">{item.selectedText}</div>
                 <div className="mt-1 text-xs">{item.explanation}</div>
@@ -143,7 +143,7 @@ export function TaskWorkspace({ taskId, mode, content, meta, existingAnnotations
           </div>
         </div>
         <div className="rounded-3xl border border-slate-200 bg-white p-4">
-          <div className="mb-3 text-sm font-semibold text-slate-900">高亮预览</div>
+          <div className="mb-3 text-sm font-semibold text-slate-900">Highlight Preview</div>
           <div className="max-h-[320px] overflow-auto rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-800 whitespace-pre-wrap">
             {highlighted.map((part) => part.type ? <mark key={part.key} className={`rounded px-1 ${errorTypeMap[part.type].color}`}>{part.text}</mark> : <span key={part.key}>{part.text}</span>)}
           </div>
