@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = env("DATABASE_PROVIDER")
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+}
+
+enum TaskMode {
+  ARTICLE
+  SOLUTION
+  CITATION
+  COMPARE
+}
+
+enum ErrorDensity {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum MistakeEntryType {
+  MISSED
+  FALSE_POSITIVE
+  WRONG_CLASSIFICATION
+}
+
+model User {
+  id           String             @id @default(cuid())
+  name         String
+  email        String             @unique
+  passwordHash String
+  role         Role
+  avatarUrl    String?
+  xp           Int                @default(0)
+  level        Int                @default(1)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  courses      Course[]           @relation("TeacherCourses")
+  enrollments  CourseEnrollment[]
+  submissions  Submission[]
+  badges       UserBadge[]
+  streak       Streak?
+  mistakes     MistakeEntry[]
+}
+
+model Course {
+  id          String             @id @default(cuid())
+  name        String
+  subject     String
+  inviteCode  String             @unique
+  teacherId   String
+  createdAt   DateTime           @default(now())
+  teacher     User               @relation("TeacherCourses", fields: [teacherId], references: [id], onDelete: Cascade)
+  enrollments CourseEnrollment[]
+  tasks       Task[]
+}
+
+model CourseEnrollment {
+  id         String   @id @default(cuid())
+  courseId   String
+  studentId  String
+  enrolledAt DateTime @default(now())
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student    User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, studentId])
+}
+
+model Task {
+  id                String        @id @default(cuid())
+  courseId          String
+  title             String
+  mode              TaskMode
+  topic             String
+  subjectArea       String
+  referenceMaterial String?
+  errorDensity      ErrorDensity
+  errorConfig       Json
+  correctContent    String
+  generatedContent  String
+  answerKey         Json
+  generatedMeta     Json?
+  deadline          DateTime?
+  isPublished       Boolean       @default(false)
+  isChallenge       Boolean       @default(false)
+  challengeDuration Int?
+  challengeStarted  DateTime?
+  createdAt         DateTime      @default(now())
+  course            Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  submissions       Submission[]
+}
+
+model Submission {
+  id                  String         @id @default(cuid())
+  taskId              String
+  studentId           String
+  annotations         Json
+  additionalResponse  Json?
+  gradingResult       Json
+  scorePrecision      Float?
+  scoreRecall         Float?
+  scoreClassification Float?
+  scoreExplanation    Float?
+  scoreOverall        Float?
+  hintsUsed           Int            @default(0)
+  submittedAt         DateTime       @default(now())
+  task                Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  student             User           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  chatSessions        ChatSession[]
+  mistakes            MistakeEntry[]
+
+  @@unique([taskId, studentId])
+}
+
+model ChatSession {
+  id             String     @id @default(cuid())
+  submissionId   String
+  errorId        Int
+  errorContext   Json
+  messages       Json
+  teachbackText  String?
+  teachbackScore Json?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  submission     Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  @@unique([submissionId, errorId])
+}
+
+model Badge {
+  id              String     @id @default(cuid())
+  name            String     @unique
+  displayName     String
+  description     String
+  icon            String
+  unlockCondition Json
+  userBadges      UserBadge[]
+}
+
+model UserBadge {
+  id         String   @id @default(cuid())
+  userId     String
+  badgeId    String
+  unlockedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge      Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+}
+
+model Streak {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  currentStreak   Int      @default(0)
+  longestStreak   Int      @default(0)
+  lastActive      DateTime?
+  freezeAvailable Boolean  @default(false)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MistakeEntry {
+  id           String           @id @default(cuid())
+  userId       String
+  submissionId String
+  errorId      Int
+  entryType    MistakeEntryType
+  personalNotes String?
+  masteryCount Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  submission   Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}

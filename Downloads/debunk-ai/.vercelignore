@@ -1,0 +1,15 @@
+.git
+.gitignore
+README.md
+*.md
+.env.local
+.env.development
+node_modules
+npm-debug.log
+yarn-error.log
+.DS_Store
+.next
+out
+build
+dist
+coverage
