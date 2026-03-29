@@ -1,15 +1,15 @@
 export const errorTypeMap = {
-  factual: { label: '事实错误', color: 'bg-rose-200 text-rose-900', border: 'border-rose-300' },
-  logical: { label: '逻辑谬误', color: 'bg-amber-200 text-amber-900', border: 'border-amber-300' },
-  hallucination: { label: 'AI 幻觉', color: 'bg-violet-200 text-violet-900', border: 'border-violet-300' },
-  conceptual: { label: '概念混淆', color: 'bg-sky-200 text-sky-900', border: 'border-sky-300' },
+  factual: { label: 'Factual Error', color: 'bg-rose-200 text-rose-900', border: 'border-rose-300' },
+  logical: { label: 'Logical Fallacy', color: 'bg-amber-200 text-amber-900', border: 'border-amber-300' },
+  hallucination: { label: 'AI Hallucination', color: 'bg-violet-200 text-violet-900', border: 'border-violet-300' },
+  conceptual: { label: 'Conceptual Confusion', color: 'bg-sky-200 text-sky-900', border: 'border-sky-300' },
 } as const;
 
 export const modeOptions = [
-  { value: 'ARTICLE', label: 'Article Review / 文章审校' },
-  { value: 'SOLUTION', label: 'Solution Audit / 解题审计' },
-  { value: 'CITATION', label: 'Citation Check / 引文核验' },
-  { value: 'COMPARE', label: 'Compare & Judge / 对比判断' },
+  { value: 'ARTICLE', label: 'Article Review' },
+  { value: 'SOLUTION', label: 'Solution Audit' },
+  { value: 'CITATION', label: 'Citation Check' },
+  { value: 'COMPARE', label: 'Compare & Judge' },
 ] as const;
 
 export const subjectOptions = ['Sciences', 'Humanities', 'Mathematics', 'Computer Science', 'Social Science', 'Language Arts'];
@@ -17,38 +17,38 @@ export const subjectOptions = ['Sciences', 'Humanities', 'Mathematics', 'Compute
 export const encyclopedia = [
   {
     id: 'factual',
-    title: '事实错误',
-    tip: '核对数字、时间、人物、地点、因果链上的客观事实。',
-    examples: ['把 1914 写成 1941', '把牛顿第三定律说成“力会自动消失”', '把真实机构名称写错'],
-    traps: ['数字很像但不对', '年份调换位置', '把常识包装成专业表达'],
+    title: 'Factual Errors',
+    tip: 'Verify numbers, dates, names, locations, and cause-effect relationships.',
+    examples: ['Writing 1914 as 1941', 'Misquoting Newton\'s Third Law', 'Misspelling institution names'],
+    traps: ['Similar looking but wrong numbers', 'Swapped year digits', 'Disguising common knowledge with technical terms'],
   },
   {
     id: 'logical',
-    title: '逻辑谬误',
-    tip: '先问“结论是不是一定由前提推出”。',
-    examples: ['把相关性当因果', '稻草人论证', '错误二分法'],
-    traps: ['论证语气很自信', '举例很多但推理链断裂'],
+    title: 'Logical Fallacies',
+    tip: 'Ask: "Must the conclusion necessarily follow from the premises?"',
+    examples: ['Treating correlation as causation', 'Straw man arguments', 'False dichotomy'],
+    traps: ['Confident tone can be misleading', 'Many examples but broken reasoning chain'],
   },
   {
     id: 'hallucination',
-    title: 'AI 幻觉',
-    tip: '重点核对引用、统计、机构、论文、期刊是否真实存在。',
-    examples: ['杜撰论文', '虚构统计来源', '不存在的大学实验室'],
-    traps: ['格式像真的', '引用风格规范但内容是假的'],
+    title: 'AI Hallucinations',
+    tip: 'Verify citations, statistics, institutions, papers, and journals.',
+    examples: ['Fabricated papers', 'Made-up statistics', 'Fictional research labs'],
+    traps: ['Proper formatting looks real', 'Correct citation style but false content'],
   },
   {
     id: 'conceptual',
-    title: '概念混淆',
-    tip: '留意相近术语是否被偷换，如 speed/velocity、weather/climate。',
-    examples: ['速度和速率混用', '机器学习和深度学习偷换', '蒸发与沸腾混淆'],
-    traps: ['术语都很熟，容易放松警惕'],
+    title: 'Conceptual Confusion',
+    tip: 'Watch for substitution of similar terms like speed/velocity, weather/climate.',
+    examples: ['Confusing speed and velocity', 'Mixing machine learning and deep learning', 'Confusing evaporation and boiling'],
+    traps: ['Easy to overlook familiar terms'],
   },
 ];
 
 export const badgeSeeds = [
-  { name: 'first_task', displayName: '🧪 初次出击', description: '完成第一份 Debunk 任务', icon: '🧪', unlockCondition: { type: 'completed_tasks', threshold: 1 } },
-  { name: 'junior_analyst', displayName: '🕵️ Junior Analyst', description: '累计正确识别 20 个错误', icon: '🕵️', unlockCondition: { type: 'true_positives', threshold: 20 } },
-  { name: 'perfect_score', displayName: '🎯 Perfect Score', description: '任意任务总分 100', icon: '🎯', unlockCondition: { type: 'perfect_score', threshold: 100 } },
-  { name: 'streak_7', displayName: '🔥 7-Day Streak', description: '连续 7 天完成任务', icon: '🔥', unlockCondition: { type: 'streak', threshold: 7 } },
-  { name: 'teachback_pro', displayName: '📚 Teach-Back Pro', description: '通过 3 次 teach-back', icon: '📚', unlockCondition: { type: 'teachback_passed', threshold: 3 } },
+  { name: 'first_task', displayName: 'First Task', description: 'Completed your first Debunk task', icon: '🧪', unlockCondition: { type: 'completed_tasks', threshold: 1 } },
+  { name: 'junior_analyst', displayName: 'Junior Analyst', description: 'Correctly identified 20 errors', icon: '🕵️', unlockCondition: { type: 'true_positives', threshold: 20 } },
+  { name: 'perfect_score', displayName: 'Perfect Score', description: 'Achieved 100 points on any task', icon: '🎯', unlockCondition: { type: 'perfect_score', threshold: 100 } },
+  { name: 'streak_7', displayName: '7-Day Streak', description: 'Completed tasks 7 days in a row', icon: '🔥', unlockCondition: { type: 'streak', threshold: 7 } },
+  { name: 'teachback_pro', displayName: 'Teach-Back Pro', description: 'Passed 3 teach-back sessions', icon: '📚', unlockCondition: { type: 'teachback_passed', threshold: 3 } },
 ];
