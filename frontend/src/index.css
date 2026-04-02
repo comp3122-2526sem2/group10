@@ -14,3 +14,31 @@
 .highlight-resolved {
     background-color: #bbf7d0;
 }
+
+.workspace-content p {
+    margin-bottom: 1.5rem;
+}
+
+.workspace-highlight {
+    background-color: #fef08a;
+    cursor: pointer;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.25rem;
+    transition: all 0.2s;
+}
+
+.workspace-highlight:hover,
+.workspace-highlight-active {
+    background-color: #fde047;
+    box-shadow: 0 0 0 2px #eab308;
+}
+
+.workspace-highlight-resolved {
+    background-color: #bbf7d0;
+    box-shadow: none;
+}
+
+.workspace-highlight-golden {
+    background-color: transparent;
+    border-bottom: 1px dashed rgba(109, 40, 217, 0.25);
+}

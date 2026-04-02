@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Target, EnvelopeSimple, LockKey, SignIn, UserPlus } from '@phosphor-icons/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { login, register } from '../api/mock';
 
 function AuthPage() {
   const navigate = useNavigate();
@@ -13,25 +14,28 @@ function AuthPage() {
   const [name, setName] = useState('');
   const [role, setRole] = useState(initialRole);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // [API_TODO] REPLACE_WITH_REAL_API: 调用 POST /api/v1/auth/login 或 POST /api/v1/auth/register
-    // [API_TODO] CONTRACT_FIELDS: login -> { token, user{id,name,role} }, register -> user basic info
-    // Simulate API Auth Request
-    setTimeout(() => {
-      // Mock successful login/register
-      localStorage.setItem('token', 'mock_jwt_token_here');
-      // [API_TODO] REPLACE_WITH_REAL_API: 登录后调用 GET /api/v1/auth/me 获取 points/name 并注入全局状态
-      
-      // Determine where to navigate based on the role state
-      if (role === 'student') navigate('/student/dashboard');
-      else if (role === 'teacher') navigate('/teacher/dashboard');
+    setError('');
+
+    try {
+      const response = isLogin
+        ? await login({ email, password })
+        : await register({ email, password, name, role });
+
+      localStorage.setItem('token', response.token);
+
+      if (response.user.role === 'student') navigate('/student/dashboard');
+      else if (response.user.role === 'teacher') navigate('/teacher/dashboard');
       else navigate('/admin/dashboard');
-      
-    }, 800);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Authentication failed.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -130,7 +134,7 @@ function AuthPage() {
           <button 
             type="submit" 
             disabled={isLoading}
-            className="w-full py-3.5 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2 mt-4"
+            className="w-full py-3.5 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-400 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2 mt-4"
           >
             {isLoading ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
@@ -139,6 +143,12 @@ function AuthPage() {
             )}
             {isLogin ? 'Sign In' : 'Create Account'}
           </button>
+
+          {error ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </p>
+          ) : null}
         </form>
 
         <div className="mt-8 text-center text-gray-500 text-sm">

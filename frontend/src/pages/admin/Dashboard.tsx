@@ -184,28 +184,9 @@ function AdminDashboard() {
                 
                 <div className="mt-6 pt-6 border-t border-gray-100">
                     <h4 className="text-sm font-semibold text-gray-700 mb-3">Assigned Teachers</h4>
-                    <ul className="space-y-3">
-                        <li className="flex justify-between items-center text-sm bg-gray-50 p-3 rounded-xl border border-gray-100">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">JD</div>
-                                <div>
-                                    <div className="font-medium">John Doe</div>
-                                    <div className="text-xs text-gray-500">johndoe@school.edu</div>
-                                </div>
-                            </div>
-                            <span className="text-xs bg-indigo-50 px-2 py-1 rounded text-indigo-600 border border-indigo-100 font-medium">Primary</span>
-                        </li>
-                        <li className="flex justify-between items-center text-sm p-3">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">MR</div>
-                                <div>
-                                    <div className="font-medium">Mr. Roberts</div>
-                                    <div className="text-xs text-gray-500">roberts@school.edu</div>
-                                </div>
-                            </div>
-                            <button className="text-red-500 hover:text-red-700 text-xs font-semibold px-2">Remove</button>
-                        </li>
-                    </ul>
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
+                      Teacher assignments are now stored in the database when you submit an email above.
+                    </div>
                 </div>
               </div>
 

@@ -1,8 +1,37 @@
-// 模拟数据及 API 请求层 (Mock Services)
-// 这里统一定义了前后端的数据契约。后端同学可以根据这里的 request payload 和 return 结构开发真实接口。
-// [API_TODO] REPLACE_WITH_REAL_API: 将本文件替换为真实 HTTP 客户端实现（baseURL=/api/v1）。
+const API_BASE = '/api/v1';
 
-// --- 学生端 API (Student API) ---
+type HttpMethod = 'GET' | 'POST';
+
+async function request<T>(path: string, options: { method?: HttpMethod; body?: unknown; auth?: boolean } = {}): Promise<T> {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: options.method ?? 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.auth === false ? {} : token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  if (!response.ok) {
+    let message = 'Request failed';
+    try {
+      const errorPayload = await response.json();
+      if (Array.isArray(errorPayload.detail)) {
+        message = errorPayload.detail
+          .map((item: { msg?: string }) => item.msg || 'Validation error')
+          .join(', ');
+      } else {
+        message = errorPayload.detail ?? errorPayload.message ?? message;
+      }
+    } catch {
+      message = response.statusText || message;
+    }
+    throw new Error(message);
+  }
+
+  return response.json() as Promise<T>;
+}
 
 export interface TaskItem {
   id: string;
@@ -14,42 +43,19 @@ export interface TaskItem {
 }
 
 export interface StudentProfile {
+  id?: string;
   name: string;
   points: number;
+  role?: string;
 }
 
-/**
- * 0. 获取学生个人信息
- * API: GET /api/v1/student/me
- */
 export const fetchStudentProfile = async (): Promise<StudentProfile> => {
-  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/student/me
-  console.log("[Mock API] Fetching student profile... GET /api/v1/student/me");
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        name: 'Jason',
-        points: 120
-      });
-    }, 300);
-  });
+  return request<StudentProfile>('/auth/me');
 };
 
-/**
- * 1. 获取学生的待办任务列表
- * API: GET /api/v1/student/tasks?status=pending
- */
 export const fetchPendingTasks = async (): Promise<TaskItem[]> => {
-  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/student/tasks?status=pending
-  console.log("[Mock API] Fetching pending tasks... GET /api/v1/student/tasks?status=pending");
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        { id: 'task-1', subject: 'Computer Science', title: 'A Brief History of Computer Science', flawsCount: 5, locked: false, status: 'pending' },
-        { id: 'task-2', subject: 'World History', title: 'The Industrial Revolution (AI Draft)', flawsCount: 8, locked: true, status: 'pending' },
-      ]);
-    }, 600);
-  });
+  const response = await request<{ data: TaskItem[] }>('/student/tasks?status=pending');
+  return response.data;
 };
 
 export interface StudentTaskDetail {
@@ -65,38 +71,8 @@ export interface StudentTaskDetail {
   totalErrors: number;
 }
 
-/**
- * 2. 获取任务全文与高亮
- * API: GET /api/v1/student/tasks/:taskId
- */
 export const fetchStudentTaskDetail = async (taskId: string): Promise<StudentTaskDetail> => {
-  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/student/tasks/:taskId
-  console.log(`[Mock API] Fetching task detail... GET /api/v1/student/tasks/${taskId}`);
-
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        taskId,
-        title: 'A Brief History of Computer Science',
-        contentHtml:
-          '<p>The development of computer science is a process full of innovation and breakthroughs...</p>',
-        highlights: [
-          {
-            highlightId: 1,
-            text: "Subsequently in 1950, Turing invented the world's first personal smartphone...",
-            isResolved: false,
-          },
-          {
-            highlightId: 2,
-            text: 'Because the serial computing power of GPUs is much lower than CPUs...',
-            isResolved: false,
-          },
-        ],
-        foundErrors: 2,
-        totalErrors: 5,
-      });
-    }, 500);
-  });
+  return request<StudentTaskDetail>(`/student/tasks/${taskId}`);
 };
 
 export interface AnnotationPayload {
@@ -115,40 +91,17 @@ export interface AnnotationResponse {
   isGolden?: boolean;
 }
 
-/**
- * 2. 提交学生的纠错表单 (核心链路)
- * 对应组件: Workspace 右侧批注栏
- * API: POST /api/v1/student/annotations
- */
 export const submitAnnotation = async (payload: AnnotationPayload): Promise<AnnotationResponse> => {
-  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/student/annotations
-  console.log("[Mock API] Submitting annotation... POST /api/v1/student/annotations", payload);
-  // 模拟网络请求和 AI 处理延迟
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // 设定 highlightId 1 作为一个“黄金幻觉”彩蛋
-      const isGolden = payload.highlightId === 1;
-      resolve({
-        success: true,
-        pointsEarned: isGolden ? 15 : 5, // 找到 Golden Hallucination 得 3 倍分
-        isCorrect: true,
-        aiFeedback: 'Excellent logic! You successfully spotted the hardware illusion.',
-        message: isGolden 
-          ? "🎉 You hit the Golden Hallucination! Triple Points Awarded!" 
-          : "Successfully debunked the AI hallucination!",
-        isGolden
-      });
-    }, 800);
+  return request<AnnotationResponse>('/student/annotations', {
+    method: 'POST',
+    body: payload,
   });
 };
-
-
-// --- 教师端 API (Teacher API) ---
 
 export interface BlindspotData {
   text: string;
   errorType: string;
-  missRate: number; // 0-1 的小数值，代表有多少学生**没发现**这个错误
+  missRate: number;
 }
 
 export interface InsightReport {
@@ -157,104 +110,82 @@ export interface InsightReport {
   blindspots: BlindspotData[];
 }
 
-/**
- * 3. 获取教师面板统计数据
- * API: GET /api/v1/teacher/overview
- */
 export const fetchTeacherOverviewStats = async () => {
-  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/teacher/overview
-  console.log("[Mock API] Fetching teacher stats... GET /api/v1/teacher/overview");
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        activeStudents: 42,
-        avgFactCheckScore: 86,
-        generatedTasks: 12
-      });
-    }, 500);
+  return request<{ activeStudents: number; avgFactCheckScore: number; generatedTasks: number }>('/teacher/overview');
+};
+
+export const fetchBlindspotHeatmap = async (taskId?: string): Promise<InsightReport> => {
+  let targetTaskId = taskId;
+  if (!targetTaskId) {
+    const tasks = await fetchRecentTasks();
+    if (!tasks.length) {
+      return {
+        taskId: 'none',
+        title: 'No published tasks yet',
+        blindspots: [],
+      };
+    }
+    targetTaskId = tasks[0].id;
+  }
+  return request<InsightReport>(`/teacher/reports/${targetTaskId}/heatmaps`);
+};
+
+export interface TeacherTask {
+  id: string;
+  title: string;
+  subject: string;
+  completion: number;
+  status?: string;
+  createdAt?: string;
+}
+
+export const fetchRecentTasks = async (): Promise<TeacherTask[]> => {
+  const response = await request<{ data: TeacherTask[] }>('/teacher/tasks');
+  return response.data;
+};
+
+export interface GeneratedDraft {
+  taskId: string;
+  title: string;
+  subject: string;
+  generatedText: string;
+  contentHtml: string;
+  highlights: Array<{
+    highlightId: number;
+    text: string;
+    errorType: string;
+    canonicalReason: string;
+    explanation: string;
+    paragraphIndex: number;
+    isGolden: boolean;
+  }>;
+  totalErrors: number;
+  status: string;
+}
+
+export const generateFlawedText = async (payload: {
+  sourceText: string;
+  density: number;
+  title?: string;
+  subject?: string;
+}): Promise<GeneratedDraft> => {
+  return request<GeneratedDraft>('/teacher/generate-flaws', {
+    method: 'POST',
+    body: {
+      sourceText: payload.sourceText,
+      density: payload.density,
+      title: payload.title ?? 'New Fact-check Task',
+      subject: payload.subject ?? 'General',
+    },
   });
 };
 
-/**
- * 4. 获取班级盲区热力图报告
- * API: GET /api/v1/teacher/reports/:taskId/heatmaps
- */
-export const fetchBlindspotHeatmap = async (): Promise<InsightReport> => {
-  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/teacher/reports/:taskId/heatmaps
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        taskId: "task-1",
-        title: "A Brief History of Computer Science",
-        blindspots: [
-          {
-            text: "Subsequently in 1950, Turing invented the world's first personal smartphone...",
-            errorType: "Golden Hallucination",
-            missRate: 0.85 // 85%的学生都没发现，高危盲区，深红
-          },
-          {
-            text: "Because the serial computing power of GPUs is much lower than CPUs, deep learning...",
-            errorType: "Logical Error",
-            missRate: 0.30 // 30%的学生没发现，中低盲区，浅红/黄
-          },
-          {
-            text: "The internet was invented by Albert Einstein in 1980.",
-            errorType: "Factual Error",
-            missRate: 0.05 // 大家都能找出来，安全，绿色
-          }
-        ]
-      });
-    }, 600);
+export const publishTask = async (payload: { taskId: string; title: string; subject: string }) => {
+  return request<{ success: boolean; taskId: string }>('/teacher/tasks', {
+    method: 'POST',
+    body: payload,
   });
 };
-
-/**
- * 5. 教师获取最近的发布任务列表
- * API: GET /api/v1/teacher/tasks
- */
-export const fetchRecentTasks = async (): Promise<any[]> => {
-  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/teacher/tasks
-  console.log("[Mock API] Fetching recent tasks... GET /api/v1/teacher/tasks");
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        { id: 'task-1', title: 'A Brief History of Computer Science', subject: 'Computer Science', completion: 85 },
-        { id: 'task-2', title: 'The Industrial Revolution (AI Draft)', subject: 'World History', completion: 40 },
-      ]);
-    }, 500);
-  });
-};
-
-/**
- * 6. 生成包含幻觉的文本
- * API: POST /api/v1/teacher/generate-flaws
- */
-export const generateFlawedText = async (payload: { sourceText: string; density: number }) => {
-  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/teacher/generate-flaws
-  console.log("[Mock API] Generating flawed text...", payload);
-  return new Promise<string>((resolve) => {
-    setTimeout(() => {
-      resolve("With the advent of the 21st century, artificial intelligence experienced explosive growth. \n\nThe breakthrough of deep learning technology relies on two factors: massive data and powerful computing capabilities. Because the serial computing power of GPUs (Graphics Processing Units) is much lower than CPUs, deep learning training relies completely on modern high-performance CPU clusters. This makes complex systems like large language models possible.\n\nIn conclusion, although modern computing architectures are increasingly complex, their underlying logic still relies on the foundations laid by Turing and von Neumann over half a century ago.");
-    }, 1500);
-  });
-};
-
-/**
- * 7. 发布任务
- * API: POST /api/v1/teacher/tasks
- */
-export const publishTask = async (payload: { title: string; content: string; subject: string }) => {
-  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/teacher/tasks
-  console.log("[Mock API] Publishing task...", payload);
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ success: true, taskId: `task-${Date.now()}` });
-    }, 800);
-  });
-};
-
-
-// --- 管理员 API (Admin API) ---
 
 export interface Classroom {
   id: string;
@@ -263,81 +194,58 @@ export interface Classroom {
   enrolled: number;
 }
 
-/**
- * 8. 获取系统所有班级
- * API: GET /api/v1/admin/classrooms
- */
 export const fetchClassrooms = async (): Promise<Classroom[]> => {
-  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/admin/classrooms
-  console.log("[Mock API] Fetching classrooms... GET /api/v1/admin/classrooms");
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        { id: 'class-cs101', name: 'Computer Science 101', code: 'CS-101-FALL', enrolled: 42 },
-        { id: 'class-hist202', name: 'World History - AI Era', code: 'WH-202-SPRG', enrolled: 128 },
-        { id: 'class-phys101', name: 'Physics & Computing', code: 'PH-101-FALL', enrolled: 85 },
-      ]);
-    }, 400);
-  });
+  return request<Classroom[]>('/admin/classrooms');
 };
 
-/**
- * 9. 创建新班级
- * API: POST /api/v1/admin/classrooms
- */
 export const createClassroom = async (payload: { name: string }): Promise<Classroom> => {
-  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/admin/classrooms
-  console.log("[Mock API] Creating classroom...", payload);
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        id: `class-${Date.now()}`,
-        name: payload.name,
-        code: `CODE-${Math.floor(Math.random() * 10000)}`,
-        enrolled: 0
-      });
-    }, 600);
+  return request<Classroom>('/admin/classrooms', {
+    method: 'POST',
+    body: payload,
   });
 };
 
-/**
- * 10. 为班级添加教师
- * API: POST /api/v1/admin/classrooms/:classId/teachers
- */
 export const assignTeacherToClassroom = async (classId: string, email: string) => {
-  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/admin/classrooms/:classId/teachers
-  console.log(`[Mock API] Assigning ${email} to classroom ${classId}...`);
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ success: true });
-    }, 500);
+  return request<{ success: boolean }>(`/admin/classrooms/${classId}/teachers`, {
+    method: 'POST',
+    body: { email },
   });
 };
 
-/**
- * 11. 刷新班级邀请码
- * API: POST /api/v1/admin/classrooms/:classId/refresh-code
- */
 export const refreshClassroomCode = async (classId: string): Promise<string> => {
-  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/admin/classrooms/:classId/refresh-code
-  console.log(`[Mock API] Refreshing code for classroom ${classId}...`);
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(`NEWCD-${Math.floor(Math.random() * 10000)}`);
-    }, 400);
+  return request<string>(`/admin/classrooms/${classId}/refresh-code`, {
+    method: 'POST',
   });
 };
 
-/**
- * 12. 批量邀请学生
- * API: POST /api/v1/admin/classrooms/:classId/students/invite
- */
 export const inviteStudents = async (classId: string, emails: string[]) => {
-  // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/admin/classrooms/:classId/students/invite
-  console.log(`[Mock API] Inviting ${emails.length} students to classroom ${classId}...`);
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ success: true, count: emails.length });
-    }, 600);
+  return request<{ success: boolean; count: number }>(`/admin/classrooms/${classId}/students/invite`, {
+    method: 'POST',
+    body: { emails },
+  });
+};
+
+export interface AuthResponse {
+  token: string;
+  user: {
+    id: string;
+    name: string;
+    role: string;
+  };
+}
+
+export const login = async (payload: { email: string; password: string }) => {
+  return request<AuthResponse>('/auth/login', {
+    method: 'POST',
+    body: payload,
+    auth: false,
+  });
+};
+
+export const register = async (payload: { email: string; password: string; name: string; role: string }) => {
+  return request<AuthResponse>('/auth/register', {
+    method: 'POST',
+    body: payload,
+    auth: false,
   });
 };

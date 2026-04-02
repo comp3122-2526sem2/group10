@@ -7,27 +7,40 @@ import { fetchStudentTaskDetail, submitAnnotation, type StudentTaskDetail } from
 function Workspace() {
   const navigate = useNavigate();
   const { taskId = 'task-1' } = useParams();
-  // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/student/tasks/:taskId
   const [taskDetail, setTaskDetail] = useState<StudentTaskDetail | null>(null);
-  const [foundErrors, setFoundErrors] = useState(2);
-  const totalErrors = taskDetail?.totalErrors ?? 5;
-  const [selectedHighlight, setSelectedHighlight] = useState<number | null>(1);
-  const [annotation, setAnnotation] = useState("");
-  const [errorType, setErrorType] = useState("Logical Error");
+  const [foundErrors, setFoundErrors] = useState(0);
+  const [selectedHighlight, setSelectedHighlight] = useState<number | null>(null);
+  const [annotation, setAnnotation] = useState('');
+  const [errorType, setErrorType] = useState('Logical Error');
   const [resolved, setResolved] = useState<number[]>([]);
-  const [resolvedData, setResolvedData] = useState<Record<number, { isGolden: boolean, points: number, message: string }>>({});
+  const [resolvedData, setResolvedData] = useState<Record<number, { isGolden: boolean; points: number; message: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  const totalErrors = taskDetail?.totalErrors ?? 0;
 
   useEffect(() => {
+    setIsLoading(true);
+    setLoadError('');
+
     fetchStudentTaskDetail(taskId)
       .then((detail) => {
+        const preResolved = detail.highlights
+          .filter((item) => item.isResolved)
+          .map((item) => item.highlightId);
+
         setTaskDetail(detail);
         setFoundErrors(detail.foundErrors);
+        setResolved(preResolved);
+        setSelectedHighlight(detail.highlights.find((item) => !item.isResolved)?.highlightId ?? null);
       })
       .catch((error) => {
         console.error('Failed to fetch task detail', error);
-      });
+        setLoadError(error instanceof Error ? error.message : 'Failed to load task.');
+      })
+      .finally(() => setIsLoading(false));
   }, [taskId]);
 
   const highlightText = useMemo(() => {
@@ -37,62 +50,91 @@ function Workspace() {
     }, {}) ?? {};
   }, [taskDetail]);
 
+  const renderedContentHtml = useMemo(() => {
+    if (!taskDetail?.contentHtml) return '';
+
+    const parser = new DOMParser();
+    const documentFragment = parser.parseFromString(taskDetail.contentHtml, 'text/html');
+    const highlightNodes = documentFragment.querySelectorAll<HTMLElement>('[data-highlight-id]');
+
+    highlightNodes.forEach((node) => {
+      const highlightId = Number(node.dataset.highlightId);
+      node.classList.add('workspace-highlight');
+
+      if (resolved.includes(highlightId)) {
+        node.classList.add('workspace-highlight-resolved');
+      } else if (selectedHighlight === highlightId) {
+        node.classList.add('workspace-highlight-active');
+      } else if (node.dataset.golden === 'true') {
+        node.classList.add('workspace-highlight-golden');
+      }
+    });
+
+    return documentFragment.body.innerHTML;
+  }, [resolved, selectedHighlight, taskDetail]);
+
   const handleLogout = () => {
-    // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/auth/logout
     localStorage.removeItem('token');
     navigate('/auth');
   };
 
+  const handleContentClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const highlightNode = target.closest<HTMLElement>('[data-highlight-id]');
+    if (!highlightNode?.dataset.highlightId) return;
+
+    setSelectedHighlight(Number(highlightNode.dataset.highlightId));
+  };
+
   const handleSubmit = async () => {
-    if (selectedHighlight !== null && !resolved.includes(selectedHighlight)) {
-      setIsSubmitting(true);
-      
-      try {
-        // 调用我们的 Mock API 层
-        const response = await submitAnnotation({
-          // [API_TODO] REPLACE_WITH_REAL_API: 这里应传 route 中真实 taskId
-          taskId,
-          highlightId: selectedHighlight,
-          errorType: errorType,
-          reason: annotation
-        });
+    if (selectedHighlight === null || resolved.includes(selectedHighlight)) return;
 
-        console.log("Response from server:", response);
+    setIsSubmitting(true);
 
-        // 更新前端状态
-        setResolved([...resolved, selectedHighlight]);
-        setResolvedData(prev => ({
-          ...prev,
-          [selectedHighlight]: {
-            isGolden: response.isGolden || false,
-            points: response.pointsEarned,
-            message: response.message
-          }
-        }));
-        setFoundErrors(prev => Math.min(prev + 1, totalErrors));
-        setAnnotation("");
+    try {
+      const response = await submitAnnotation({
+        taskId,
+        highlightId: selectedHighlight,
+        errorType,
+        reason: annotation,
+      });
 
-        // 如果是隐藏彩蛋，播放撒花动画
-        if (response.isGolden) {
-          confetti({
-            particleCount: 150,
-            spread: 80,
-            origin: { y: 0.6 },
-            colors: ['#FFD700', '#FFA500', '#FF8C00'] // 金色系
-          });
-        }
-      } catch (error) {
-        console.error("Failed to submit annotation", error);
-      } finally {
-        setIsSubmitting(false);
+      setResolved((current) => [...current, selectedHighlight]);
+      setResolvedData((current) => ({
+        ...current,
+        [selectedHighlight]: {
+          isGolden: response.isGolden || false,
+          points: response.pointsEarned,
+          message: response.message,
+        },
+      }));
+
+      if (response.isCorrect) {
+        setFoundErrors((current) => Math.min(current + 1, totalErrors));
       }
+
+      setAnnotation('');
+
+      if (response.isGolden) {
+        confetti({
+          particleCount: 150,
+          spread: 80,
+          origin: { y: 0.6 },
+          colors: ['#FFD700', '#FFA500', '#FF8C00'],
+        });
+      }
+    } catch (error) {
+      console.error('Failed to submit annotation', error);
+      alert(error instanceof Error ? error.message : 'Failed to submit annotation.');
+    } finally {
+      setIsSubmitting(false);
     }
-    setSelectedHighlight(null);
   };
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans overflow-hidden">
-      {/* 绝对统一的高度与排版的顶部导航栏 */}
       <header className="bg-white border-b border-gray-200 px-8 h-[72px] flex justify-between items-center shrink-0 w-full z-10">
         <div className="flex items-center gap-3 w-1/3">
           <button onClick={() => navigate('/student/dashboard')} className="mr-2 text-gray-400 hover:text-violet-600 transition">
@@ -101,7 +143,7 @@ function Workspace() {
           <Target weight="fill" className="text-violet-600 text-3xl" />
           <h1 className="text-xl font-bold text-gray-900">Debunk AI</h1>
         </div>
-        
+
         <div className="flex justify-center w-1/3">
           <div className="flex bg-white px-5 py-2 rounded-full border border-gray-200 shadow-sm items-center gap-4">
             <span className="text-sm font-semibold text-gray-600">Task Progress</span>
@@ -110,15 +152,15 @@ function Workspace() {
                 You've found <span className="text-violet-600 font-bold text-lg">{foundErrors}/{totalErrors}</span> AI errors
               </div>
               <div className="w-32 h-2.5 bg-gray-100 rounded-full ml-2 overflow-hidden border border-gray-200">
-                <div 
+                <div
                   className="h-full bg-violet-600 transition-all duration-500 rounded-full"
-                  style={{ width: `${(foundErrors / totalErrors) * 100}%` }}
+                  style={{ width: `${totalErrors ? (foundErrors / totalErrors) * 100 : 0}%` }}
                 ></div>
               </div>
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center justify-end gap-4 w-1/3">
           <div className="relative">
             <button onClick={() => setProfileOpen((v) => !v)} className="text-gray-400 hover:text-violet-600 cursor-pointer transition">
@@ -138,53 +180,35 @@ function Workspace() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex flex-1 overflow-hidden">
-        {/* Left Panel: Text Reading Area */}
         <section className="flex-1 overflow-y-auto w-2/3 p-12 bg-white z-0 relative">
           <div className="max-w-4xl mx-auto">
             <div className="mb-10">
-              {/* [API_TODO] REPLACE_WITH_REAL_API: title/contentHtml/highlights 来自 GET /api/v1/student/tasks/:taskId */}
-              <h2 className="text-3xl font-bold text-gray-900 mb-3">{taskDetail?.title ?? 'A Brief History of Computer Science (AI-Generated)'}</h2>
+              <h2 className="text-3xl font-bold text-gray-900 mb-3">{taskDetail?.title ?? 'Loading task...'}</h2>
               <p className="text-sm text-gray-500 flex items-center gap-2">
                 <Robot size={18} /> Generated by AI Assistant. Please review and debunk the flaws.
               </p>
             </div>
-            <div className="space-y-6 text-lg leading-relaxed text-gray-800">
-              <p>
-                The development of computer science is a process full of innovation and breakthroughs. Early calculation tools can be traced back to the ancient abacus. However, modern computers in the true sense originated in the mid-20th century.
-              </p>
-              <p>
-                During World War II, Alan Turing proposed the concept of the "Turing Machine" and successfully cracked the German Enigma machine.{' '}
-                {/* 隐藏的彩蛋（Golden Hallucination），没有任何视觉提示，只有 hover 或选中时才会有变化，甚至只有选中才会知道。
-                    这里移除传统的 highlight 类名，使用普通文本配合极轻微的交互，让它“看起来完全不像个错误”。 */}
-                <span 
-                  className={`cursor-text transition-colors duration-300 ${selectedHighlight === 1 && !resolved.includes(1) ? 'bg-violet-100 text-violet-900 rounded px-1' : ''} ${resolved.includes(1) ? 'text-yellow-600 font-medium' : ''}`}
-                  onClick={() => setSelectedHighlight(1)}
-                  title="Click to anaylze this sentence"
-                >
-                  Subsequently in 1950, Turing invented the world's first personal smartphone, which greatly promoted the development of the mobile internet.
-                </span>{' '}
-                This feat completely changed the way humans communicate.
-              </p>
-              <p>
-                Entering the 21st century, artificial intelligence experienced explosive growth. The breakthrough of deep learning technology relies on two factors: massive data and powerful computing capabilities.{' '}
-                <span 
-                  className={`highlight ${selectedHighlight === 2 && !resolved.includes(2) ? 'active' : ''} ${resolved.includes(2) ? 'highlight-resolved' : ''}`}
-                  onClick={() => setSelectedHighlight(2)}
-                >
-                  Because the serial computing power of GPUs (Graphics Processing Units) is much lower than CPUs, deep learning training relies completely on modern high-performance CPU clusters.
-                </span>{' '}
-                This makes complex systems like large language models possible.
-              </p>
-              <p>
-                In conclusion, although modern computing architectures are increasingly complex, their underlying logic still relies on the foundations laid by Turing and von Neumann over half a century ago.
-              </p>
-            </div>
+
+            {isLoading ? (
+              <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 px-5 py-4 text-gray-600">
+                <Spinner size={20} className="animate-spin" />
+                Loading task content...
+              </div>
+            ) : loadError ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
+                {loadError}
+              </div>
+            ) : (
+              <div
+                className="space-y-6 text-lg leading-relaxed text-gray-800 workspace-content"
+                onClick={handleContentClick}
+                dangerouslySetInnerHTML={{ __html: renderedContentHtml }}
+              />
+            )}
           </div>
         </section>
 
-        {/* Right Panel: Annotation Box */}
         <aside className="w-[450px] bg-gray-50 border-l border-gray-200 p-8 flex flex-col h-full overflow-y-auto shrink-0">
           {selectedHighlight && !resolved.includes(selectedHighlight) ? (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col gap-6 animate-fade-in-up">
@@ -197,15 +221,15 @@ function Workspace() {
                   <X size={20} />
                 </button>
               </div>
-              
+
               <div className="bg-yellow-50 text-yellow-800 text-sm p-4 rounded-xl border border-yellow-200 italic shadow-inner">
-                "{highlightText[selectedHighlight] ?? (selectedHighlight === 1 ? 'Subsequently in 1950, Turing invented the world\'s first personal smartphone, which greatly promoted the development of the mobile internet.' : 'Because the serial computing power of GPUs (Graphics Processing Units) is much lower than CPUs, deep learning training relies completely on modern high-performance CPU clusters.')}"
+                "{highlightText[selectedHighlight] ?? ''}"
               </div>
 
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-semibold text-gray-700">Error Type</label>
                 <div className="relative">
-                  <select 
+                  <select
                     className="w-full appearance-none bg-white border border-gray-300 text-gray-700 rounded-xl py-3 px-4 pr-10 outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition shadow-sm cursor-pointer hover:bg-gray-50"
                     value={errorType}
                     onChange={(e) => setErrorType(e.target.value)}
@@ -222,7 +246,7 @@ function Workspace() {
 
               <div className="flex flex-col gap-2 flex-grow">
                 <label className="text-sm font-semibold text-gray-700">Correction Reason</label>
-                <textarea 
+                <textarea
                   placeholder="Please enter your correction reason or the factual knowledge..."
                   className="w-full h-32 bg-white border border-gray-300 rounded-xl p-3 outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 resize-none transition shadow-sm"
                   value={annotation}
@@ -231,7 +255,7 @@ function Workspace() {
                 ></textarea>
               </div>
 
-              <button 
+              <button
                 onClick={handleSubmit}
                 disabled={!annotation.trim() || isSubmitting}
                 className={`w-full py-3 rounded-xl font-bold text-white shadow-sm transition-all flex items-center justify-center gap-2 ${
@@ -246,17 +270,17 @@ function Workspace() {
                 {isSubmitting ? 'Submitting...' : 'Submit Correction'}
               </button>
             </div>
-          ) : resolved.includes(selectedHighlight as number) ? (
+          ) : selectedHighlight !== null && resolved.includes(selectedHighlight) ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 gap-3 animate-fade-in-up">
-              {resolvedData[selectedHighlight as number]?.isGolden ? (
+              {resolvedData[selectedHighlight]?.isGolden ? (
                 <>
                   <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-yellow-200 to-yellow-500 flex items-center justify-center text-white mb-2 shadow-lg scale-[1.1]">
                     <Star weight="fill" size={42} />
                   </div>
                   <h3 className="font-bold text-xl text-yellow-600">Golden Hallucination!</h3>
-                  <p className="font-medium text-gray-700">{resolvedData[selectedHighlight as number]?.message}</p>
+                  <p className="font-medium text-gray-700">{resolvedData[selectedHighlight]?.message}</p>
                   <p className="text-sm font-bold text-yellow-600 bg-yellow-50 border border-yellow-200 px-4 py-2 rounded-full mt-2">
-                    +{resolvedData[selectedHighlight as number]?.points} Points
+                    +{resolvedData[selectedHighlight]?.points} Points
                   </p>
                 </>
               ) : (
@@ -264,8 +288,8 @@ function Workspace() {
                   <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-green-500 mb-2">
                     <CheckCircle weight="fill" size={36} />
                   </div>
-                  <p className="font-medium text-gray-700">{resolvedData[selectedHighlight as number]?.message || 'Successfully debunked this error!'}</p>
-                  <p className="text-sm font-medium text-green-600">+{resolvedData[selectedHighlight as number]?.points || 1} Point, Great job!</p>
+                  <p className="font-medium text-gray-700">{resolvedData[selectedHighlight]?.message || 'Successfully debunked this error!'}</p>
+                  <p className="text-sm font-medium text-green-600">+{resolvedData[selectedHighlight]?.points || 1} Point, Great job!</p>
                 </>
               )}
             </div>

@@ -1,60 +1,117 @@
 import { useState, useEffect } from 'react';
 import { Target, UserCircle, UploadSimple, ChalkboardTeacher, ChartBar, Flame, WarningCircle, Robot, TestTube, Spinner } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  fetchBlindspotHeatmap, 
-  fetchTeacherOverviewStats, 
-  fetchRecentTasks, 
+import {
+  fetchBlindspotHeatmap,
+  fetchTeacherOverviewStats,
+  fetchRecentTasks,
   generateFlawedText,
   publishTask,
-  type InsightReport 
+  type InsightReport,
+  type GeneratedDraft,
+  type TeacherTask,
 } from '../../api/mock';
 
 function TeacherDashboard() {
   const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
   const [heatmapData, setHeatmapData] = useState<InsightReport | null>(null);
-  const [overviewStats, setOverviewStats] = useState<any>(null);
-  const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [overviewStats, setOverviewStats] = useState<{ activeStudents: number; avgFactCheckScore: number; generatedTasks: number } | null>(null);
+  const [recentTasks, setRecentTasks] = useState<TeacherTask[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'generation' | 'analytics'>('overview');
-  
-  const [sourceText, setSourceText] = useState("");
-  const [hallucinationDensity, setHallucinationDensity] = useState(2); // 1-3
+
+  const [taskTitle, setTaskTitle] = useState('New Fact-check Task');
+  const [subject, setSubject] = useState('General');
+  const [sourceText, setSourceText] = useState('');
+  const [hallucinationDensity, setHallucinationDensity] = useState(2);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedText, setGeneratedText] = useState("");
+  const [generatedDraft, setGeneratedDraft] = useState<GeneratedDraft | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchBlindspotHeatmap().then(setHeatmapData);
-    fetchTeacherOverviewStats().then(setOverviewStats);
-    fetchRecentTasks().then(setRecentTasks);
+    const loadDashboard = async () => {
+      try {
+        const [overview, tasks] = await Promise.all([
+          fetchTeacherOverviewStats(),
+          fetchRecentTasks(),
+        ]);
+        setOverviewStats(overview);
+        setRecentTasks(tasks);
+
+        if (tasks.length > 0) {
+          const report = await fetchBlindspotHeatmap(tasks[0].id);
+          setHeatmapData(report);
+        } else {
+          setHeatmapData({
+            taskId: 'none',
+            title: 'No published tasks yet',
+            blindspots: [],
+          });
+        }
+      } catch (loadError) {
+        console.error('Failed to load teacher dashboard', loadError);
+        setError(loadError instanceof Error ? loadError.message : 'Failed to load dashboard.');
+      }
+    };
+
+    loadDashboard().catch(console.error);
   }, []);
 
   const handleLogout = () => {
-    // [API_TODO] CONTRACT_ENDPOINT: POST /api/v1/auth/logout
     localStorage.removeItem('token');
     navigate('/auth');
   };
 
   const handleGenerate = async () => {
-    if (!sourceText.trim()) return alert("Please enter source material!");
+    if (!sourceText.trim()) {
+      alert('Please enter source material.');
+      return;
+    }
+
     setIsGenerating(true);
+    setError('');
+
     try {
-      const res = await generateFlawedText({ sourceText, density: hallucinationDensity });
-      setGeneratedText(res);
+      const response = await generateFlawedText({
+        sourceText,
+        density: hallucinationDensity,
+        title: taskTitle,
+        subject,
+      });
+      setGeneratedDraft(response);
+    } catch (generateError) {
+      console.error('Failed to generate task', generateError);
+      setError(generateError instanceof Error ? generateError.message : 'Failed to generate task.');
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handlePublish = async () => {
+    if (!generatedDraft) return;
+
     setIsPublishing(true);
+    setError('');
+
     try {
-      await publishTask({ title: "New Fact-check Task", content: generatedText, subject: "General" });
-      alert("Mock: Task published successfully!");
-      setGeneratedText("");
-      setSourceText("");
-      setActiveTab("overview");
+      await publishTask({ taskId: generatedDraft.taskId, title: taskTitle, subject });
+      const [overview, tasks] = await Promise.all([
+        fetchTeacherOverviewStats(),
+        fetchRecentTasks(),
+      ]);
+      setOverviewStats(overview);
+      setRecentTasks(tasks);
+      if (tasks.length > 0) {
+        const report = await fetchBlindspotHeatmap(tasks[0].id);
+        setHeatmapData(report);
+      }
+      setGeneratedDraft(null);
+      setSourceText('');
+      setActiveTab('overview');
+    } catch (publishError) {
+      console.error('Failed to publish task', publishError);
+      setError(publishError instanceof Error ? publishError.message : 'Failed to publish task.');
     } finally {
       setIsPublishing(false);
     }
@@ -62,7 +119,6 @@ function TeacherDashboard() {
 
   return (
     <div className="h-screen bg-gray-50 font-sans text-gray-800 flex flex-col overflow-hidden">
-      {/* 绝对统一的高度与排版的顶部导航栏（全宽，置顶） */}
       <header className="bg-white border-b border-gray-200 px-8 h-[72px] flex justify-between items-center shrink-0 w-full z-20">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
           <Target weight="fill" className="text-violet-600 text-3xl" />
@@ -88,7 +144,6 @@ function TeacherDashboard() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
         <aside className="w-64 bg-white border-r border-gray-200 p-6 flex flex-col h-full overflow-y-auto shrink-0">
           <nav className="space-y-4">
             <button onClick={() => setActiveTab('overview')} className={`w-full flex items-center justify-start gap-4 font-semibold px-4 py-4 rounded-xl transition-all text-[15px] ${activeTab === 'overview' ? 'text-violet-700 bg-violet-50 border border-violet-100' : 'text-gray-600 hover:bg-gray-50 hover:text-violet-600'}`}>
@@ -106,17 +161,20 @@ function TeacherDashboard() {
           </nav>
         </aside>
 
-        {/* Main Panel */}
-        {/* Fix scroll issue by making this correctly scrollable relative to viewport */}
         <main className="flex-1 overflow-y-auto h-full bg-gray-50">
           <div className="px-10 py-8 max-w-6xl mx-auto pb-24">
+            {error ? (
+              <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
+                {error}
+              </div>
+            ) : null}
+
             {activeTab === 'overview' && (
               <>
                 <header className="mb-8 flex justify-between items-center">
                   <h2 className="text-3xl font-bold text-gray-900">Class Overview</h2>
                 </header>
 
-                {/* Quick Stats (统一卡片) */}
                 <div className="grid grid-cols-3 gap-6 mb-10">
                   <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition">
                     <p className="text-gray-500 text-sm font-medium mb-1">Active Students</p>
@@ -132,7 +190,6 @@ function TeacherDashboard() {
                   </div>
                 </div>
 
-                {/* Recent Tasks List (替换掉之前的 Create Task Teaser) */}
                 <h3 className="text-xl font-bold text-gray-900 mb-4 mt-8">Recent Fact-Check Tasks</h3>
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-10">
                   <table className="w-full text-left border-collapse">
@@ -145,7 +202,7 @@ function TeacherDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {recentTasks.map(task => (
+                      {recentTasks.length ? recentTasks.map(task => (
                         <tr key={task.id} className="hover:bg-gray-50 transition">
                           <td className="p-4 font-medium text-gray-900">{task.title}</td>
                           <td className="p-4 text-gray-500">{task.subject}</td>
@@ -158,10 +215,23 @@ function TeacherDashboard() {
                             </div>
                           </td>
                           <td className="p-4 text-right">
-                            <button onClick={() => setActiveTab('analytics')} className="text-violet-600 font-medium hover:text-violet-800 transition">View Insights</button>
+                            <button
+                              onClick={async () => {
+                                setActiveTab('analytics');
+                                const report = await fetchBlindspotHeatmap(task.id);
+                                setHeatmapData(report);
+                              }}
+                              className="text-violet-600 font-medium hover:text-violet-800 transition"
+                            >
+                              View Insights
+                            </button>
                           </td>
                         </tr>
-                      ))}
+                      )) : (
+                        <tr>
+                          <td colSpan={4} className="p-6 text-center text-gray-500">No published tasks yet.</td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -172,28 +242,51 @@ function TeacherDashboard() {
               <>
                 <header className="mb-8">
                   <h2 className="text-3xl font-bold text-gray-900">Materials & AI Generation</h2>
-                  <p className="text-gray-500 mt-2">Adjust the parameters to determine how the AI modifies your original text.</p>
+                  <p className="text-gray-500 mt-2">Generate a flawed passage from your own class material, then publish it to students.</p>
                 </header>
 
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 flex gap-10">
-                  <div className="flex-1">
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Source Material</label>
-                    <textarea 
-                      value={sourceText}
-                      onChange={(e) => setSourceText(e.target.value)}
-                      className="w-full h-80 bg-gray-50 border border-gray-200 rounded-xl p-4 outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 resize-none transition"
-                      placeholder="Paste your original text or course notes here... The AI will use this as a baseline to insert hallucinations."
-                    ></textarea>
+                  <div className="flex-1 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Task Title</label>
+                        <input
+                          value={taskTitle}
+                          onChange={(e) => setTaskTitle(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition"
+                          placeholder="Industrial Revolution"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Subject</label>
+                        <input
+                          value={subject}
+                          onChange={(e) => setSubject(e.target.value)}
+                          className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 transition"
+                          placeholder="World History"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Source Material</label>
+                      <textarea
+                        value={sourceText}
+                        onChange={(e) => setSourceText(e.target.value)}
+                        className="w-full h-80 bg-gray-50 border border-gray-200 rounded-xl p-4 outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500 resize-none transition"
+                        placeholder="Paste your original text or course notes here..."
+                      ></textarea>
+                    </div>
                   </div>
                   <div className="w-80 flex flex-col gap-8">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                         <TestTube size={20} className="text-violet-600" /> Hallucination Density
                       </label>
-                      <input 
-                        type="range" 
-                        min="1" 
-                        max="3" 
+                      <input
+                        type="range"
+                        min="1"
+                        max="3"
                         value={hallucinationDensity}
                         onChange={(e) => setHallucinationDensity(Number(e.target.value))}
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-violet-600"
@@ -206,14 +299,14 @@ function TeacherDashboard() {
                       <p className="text-sm text-gray-600 bg-violet-50 p-4 rounded-xl mt-4 border border-violet-100">
                         {hallucinationDensity === 1 && "Creates obvious factual errors. Best for beginners."}
                         {hallucinationDensity === 2 && "Mixes factual and logical errors. Good for standard tests."}
-                        {hallucinationDensity === 3 && "Subtle causal inversions & deep AI hallucinations. Expect a high fail rate!"}
+                        {hallucinationDensity === 3 && "Subtle causal inversions and deep AI hallucinations. Expect a high fail rate."}
                       </p>
                     </div>
 
-                    <button 
+                    <button
                       onClick={handleGenerate}
                       disabled={isGenerating}
-                      className={`w-full py-4 text-white rounded-xl font-bold font-heading shadow-sm transition flex justify-center items-center gap-2 ${isGenerating ? 'bg-violet-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700'}`}
+                      className={`w-full py-4 text-white rounded-xl font-bold shadow-sm transition flex justify-center items-center gap-2 ${isGenerating ? 'bg-violet-400 cursor-not-allowed' : 'bg-violet-600 hover:bg-violet-700'}`}
                     >
                       {isGenerating ? <Spinner size={22} className="animate-spin" /> : <Robot size={22} />}
                       {isGenerating ? 'Generating...' : 'Generate Flawed Text'}
@@ -221,33 +314,47 @@ function TeacherDashboard() {
                   </div>
                 </div>
 
-                {/* 生成结果展示区域 */}
-                {generatedText && (
+                {generatedDraft && (
                   <div className="mt-8 bg-white border border-violet-100 rounded-3xl p-8 shadow-sm animate-fade-in-up">
                     <div className="flex items-center justify-between mb-6 border-b border-gray-100 pb-4">
-                      <h3 className="text-xl font-bold font-heading text-gray-900 flex items-center gap-2">
+                      <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                         <Robot size={24} className="text-violet-600" /> Generated Material Preview
                       </h3>
                       <span className="text-sm font-semibold px-3 py-1 bg-violet-100 text-violet-700 rounded-full">
                         Density: {hallucinationDensity}
                       </span>
                     </div>
-                    
+
                     <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 text-gray-800 text-lg leading-relaxed whitespace-pre-wrap min-h-[150px]">
-                      {generatedText}
+                      {generatedDraft.generatedText}
+                    </div>
+
+                    <div className="mt-6 rounded-2xl border border-gray-100 bg-violet-50/50 p-5">
+                      <h4 className="font-semibold text-gray-900 mb-3">Injected Errors</h4>
+                      <div className="space-y-3">
+                        {generatedDraft.highlights.map((item) => (
+                          <div key={item.highlightId} className="rounded-xl border border-violet-100 bg-white px-4 py-3">
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="font-medium text-gray-900">{item.text}</span>
+                              <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">{item.errorType}</span>
+                            </div>
+                            <p className="mt-2 text-sm text-gray-600">{item.canonicalReason}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="mt-8 flex justify-end gap-3">
-                      <button 
-                        onClick={() => setGeneratedText('')}
+                      <button
+                        onClick={() => setGeneratedDraft(null)}
                         className="px-6 py-2.5 rounded-xl font-semibold text-gray-600 hover:bg-gray-100 transition"
                       >
                         Discard
                       </button>
-                      <button 
+                      <button
                         onClick={handlePublish}
                         disabled={isPublishing}
-                        className={`px-6 py-2.5 rounded-xl font-semibold bg-violet-600 text-white hover:bg-violet-700 shadow-sm transition flex items-center gap-2 ${isPublishing && 'opacity-75'}`}
+                        className={`px-6 py-2.5 rounded-xl font-semibold bg-violet-600 text-white hover:bg-violet-700 shadow-sm transition flex items-center gap-2 ${isPublishing ? 'opacity-75' : ''}`}
                       >
                         {isPublishing ? <Spinner className="animate-spin" /> : null} Publish to Students
                       </button>
@@ -262,19 +369,17 @@ function TeacherDashboard() {
                 <header className="mb-8">
                   <h2 className="text-3xl font-bold text-gray-900">Student Analytics & Insights</h2>
                 </header>
-                {/* Blindspot Heatmap Component */}
                 <section className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
                   <div className="flex items-center gap-3 mb-6">
                     <Flame weight="fill" className="text-red-500 text-2xl" />
                     <h3 className="text-2xl font-bold text-gray-900">Class Blindspot Heatmap</h3>
                   </div>
                   <p className="text-gray-500 mb-8 max-w-3xl">
-                    This heatmap shows the AI errors that students struggled to identify in the recent task <span className="font-bold text-gray-700">"{heatmapData?.title}"</span>. Darker red indicates a higher miss rate (students believed the AI).
+                    This heatmap shows the AI errors that students struggled to identify in the recent task <span className="font-bold text-gray-700">"{heatmapData?.title}"</span>. Darker red indicates a higher miss rate.
                   </p>
 
                   <div className="space-y-4">
-                    {heatmapData?.blindspots.map((spot, idx) => {
-                      // 根据 missRate 决定背景颜色的深浅。越高（越多人被骗），颜色越深 (红)；越低则显绿色。
+                    {heatmapData?.blindspots.length ? heatmapData.blindspots.map((spot, idx) => {
                       let bgColorClass = "bg-red-500 text-white";
                       let warningLevel = "Critical Blindspot";
                       if (spot.missRate < 0.2) {
@@ -304,7 +409,7 @@ function TeacherDashboard() {
                               "{spot.text}"
                             </p>
                           </div>
-                          
+
                           <div className="w-32 flex flex-col items-center justify-center shrink-0">
                             <span className="text-3xl font-black text-gray-900">
                               {Math.round(spot.missRate * 100)}%
@@ -315,7 +420,11 @@ function TeacherDashboard() {
                           </div>
                         </div>
                       );
-                    })}
+                    }) : (
+                      <div className="rounded-2xl border border-gray-200 bg-gray-50 px-5 py-6 text-center text-gray-500">
+                        Publish a task and collect student submissions to see analytics here.
+                      </div>
+                    )}
                   </div>
                 </section>
               </>
