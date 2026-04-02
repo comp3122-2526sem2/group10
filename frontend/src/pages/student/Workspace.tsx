@@ -8,11 +8,11 @@ function Workspace() {
   const navigate = useNavigate();
   const { taskId = 'task-1' } = useParams();
   const [taskDetail, setTaskDetail] = useState<StudentTaskDetail | null>(null);
-  const [foundErrors, setFoundErrors] = useState(0);
   const [selectedHighlight, setSelectedHighlight] = useState<number | null>(null);
   const [annotation, setAnnotation] = useState('');
   const [errorType, setErrorType] = useState('Logical Error');
   const [resolved, setResolved] = useState<number[]>([]);
+  const [submitted, setSubmitted] = useState<number[]>([]);
   const [resolvedData, setResolvedData] = useState<Record<number, { isGolden: boolean; points: number; message: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -30,18 +30,27 @@ function Workspace() {
         const preResolved = detail.highlights
           .filter((item) => item.isResolved)
           .map((item) => item.highlightId);
+        const preSubmitted = detail.highlights
+          .filter((item) => item.isSubmitted)
+          .map((item) => item.highlightId);
 
         setTaskDetail(detail);
-        setFoundErrors(detail.foundErrors);
         setResolved(preResolved);
-        setSelectedHighlight(detail.highlights.find((item) => !item.isResolved)?.highlightId ?? null);
+        setSubmitted(preSubmitted);
+
+        if (detail.submittedCount >= detail.totalErrors) {
+          navigate(`/student/review/${taskId}`, { replace: true });
+          return;
+        }
+
+        setSelectedHighlight(detail.highlights.find((item) => !item.isSubmitted)?.highlightId ?? null);
       })
       .catch((error) => {
         console.error('Failed to fetch task detail', error);
         setLoadError(error instanceof Error ? error.message : 'Failed to load task.');
       })
       .finally(() => setIsLoading(false));
-  }, [taskId]);
+  }, [navigate, taskId]);
 
   const highlightText = useMemo(() => {
     return taskDetail?.highlights.reduce<Record<number, string>>((acc, item) => {
@@ -85,11 +94,14 @@ function Workspace() {
     const highlightNode = target.closest<HTMLElement>('[data-highlight-id]');
     if (!highlightNode?.dataset.highlightId) return;
 
-    setSelectedHighlight(Number(highlightNode.dataset.highlightId));
+    const highlightId = Number(highlightNode.dataset.highlightId);
+    if (submitted.includes(highlightId)) return;
+
+    setSelectedHighlight(highlightId);
   };
 
   const handleSubmit = async () => {
-    if (selectedHighlight === null || resolved.includes(selectedHighlight)) return;
+    if (selectedHighlight === null || submitted.includes(selectedHighlight)) return;
 
     setIsSubmitting(true);
 
@@ -101,7 +113,8 @@ function Workspace() {
         reason: annotation,
       });
 
-      setResolved((current) => [...current, selectedHighlight]);
+      const nextSubmitted = Array.from(new Set([...submitted, selectedHighlight]));
+      setSubmitted(nextSubmitted);
       setResolvedData((current) => ({
         ...current,
         [selectedHighlight]: {
@@ -112,7 +125,7 @@ function Workspace() {
       }));
 
       if (response.isCorrect) {
-        setFoundErrors((current) => Math.min(current + 1, totalErrors));
+        setResolved((current) => [...current, selectedHighlight]);
       }
 
       setAnnotation('');
@@ -125,6 +138,14 @@ function Workspace() {
           colors: ['#FFD700', '#FFA500', '#FF8C00'],
         });
       }
+
+      if (nextSubmitted.length >= totalErrors) {
+        navigate(`/student/review/${taskId}`);
+        return;
+      }
+
+      const nextHighlight = taskDetail?.highlights.find((item) => !nextSubmitted.includes(item.highlightId))?.highlightId ?? null;
+      setSelectedHighlight(nextHighlight);
     } catch (error) {
       console.error('Failed to submit annotation', error);
       alert(error instanceof Error ? error.message : 'Failed to submit annotation.');
@@ -149,12 +170,12 @@ function Workspace() {
             <span className="text-sm font-semibold text-gray-600">Task Progress</span>
             <div className="flex gap-2 items-center">
               <div className="text-sm font-medium text-gray-700">
-                You've found <span className="text-violet-600 font-bold text-lg">{foundErrors}/{totalErrors}</span> AI errors
+                Submitted <span className="text-violet-600 font-bold text-lg">{submitted.length}/{totalErrors}</span> annotations
               </div>
               <div className="w-32 h-2.5 bg-gray-100 rounded-full ml-2 overflow-hidden border border-gray-200">
                 <div
                   className="h-full bg-violet-600 transition-all duration-500 rounded-full"
-                  style={{ width: `${totalErrors ? (foundErrors / totalErrors) * 100 : 0}%` }}
+                  style={{ width: `${totalErrors ? (submitted.length / totalErrors) * 100 : 0}%` }}
                 ></div>
               </div>
             </div>
@@ -210,7 +231,7 @@ function Workspace() {
         </section>
 
         <aside className="w-[450px] bg-gray-50 border-l border-gray-200 p-8 flex flex-col h-full overflow-y-auto shrink-0">
-          {selectedHighlight && !resolved.includes(selectedHighlight) ? (
+          {selectedHighlight && !submitted.includes(selectedHighlight) ? (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 flex flex-col gap-6 animate-fade-in-up">
               <div className="flex justify-between items-center border-b border-gray-100 pb-4">
                 <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
@@ -271,7 +292,7 @@ function Workspace() {
               </button>
             </div>
           ) : selectedHighlight !== null && resolved.includes(selectedHighlight) ? (
-            <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 gap-3 animate-fade-in-up">
+            <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 gap-3 animate-fade-in-up rounded-2xl bg-white border border-gray-200 p-6">
               {resolvedData[selectedHighlight]?.isGolden ? (
                 <>
                   <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-yellow-200 to-yellow-500 flex items-center justify-center text-white mb-2 shadow-lg scale-[1.1]">
@@ -293,8 +314,16 @@ function Workspace() {
                 </>
               )}
             </div>
+          ) : selectedHighlight !== null && submitted.includes(selectedHighlight) ? (
+            <div className="flex flex-col items-center justify-center h-full text-center gap-3 rounded-2xl bg-white border border-gray-200 p-6">
+              <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mb-2">
+                <CheckCircle weight="fill" size={36} />
+              </div>
+              <p className="font-medium text-gray-700">{resolvedData[selectedHighlight]?.message || 'Annotation submitted.'}</p>
+              <p className="text-sm text-gray-500">Finish all annotations to unlock the separate review page.</p>
+            </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 gap-4">
+            <div className="flex flex-col items-center justify-center h-full text-center text-gray-400 gap-4 rounded-2xl bg-white border border-gray-200 p-6">
               <CursorText size={48} className="opacity-50" />
               <p className="font-medium text-gray-500 leading-relaxed">Select/click highlighted text on the left<br/>to start your "Debunk" task</p>
             </div>

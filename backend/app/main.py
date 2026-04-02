@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import json
 import os
 import re
 from typing import Any
@@ -11,7 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .db import bootstrap, get_connection, utc_now
-from .llm import LLMError, fallback_generate_flawed_task, generate_flawed_task, judge_annotation
+from .llm import (
+    LLMError,
+    build_simulated_study_guide,
+    fallback_generate_flawed_task,
+    generate_flawed_task,
+    judge_annotation,
+)
 
 
 bootstrap()
@@ -44,6 +51,153 @@ def create_session(user_id: str) -> str:
 
 def normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip().lower()
+
+
+def fetch_highlights_for_task(connection: Any, task_id: str) -> list[dict[str, Any]]:
+    rows = connection.execute(
+        """
+        SELECT highlight_id, text, error_type, canonical_reason, explanation, is_golden
+        FROM task_highlights
+        WHERE task_id = ?
+        ORDER BY highlight_id
+        """,
+        (task_id,),
+    ).fetchall()
+    return [
+        {
+            "highlightId": row["highlight_id"],
+            "text": row["text"],
+            "errorType": row["error_type"],
+            "canonicalReason": row["canonical_reason"],
+            "explanation": row["explanation"],
+            "isGolden": bool(row["is_golden"]),
+        }
+        for row in rows
+    ]
+
+
+def store_study_guide(connection: Any, task_id: str, study_guide: dict[str, Any]) -> None:
+    now = utc_now()
+    connection.execute("DELETE FROM task_study_guides WHERE task_id = ?", (task_id,))
+    connection.execute("DELETE FROM task_study_sections WHERE task_id = ?", (task_id,))
+    connection.execute("DELETE FROM task_study_references WHERE task_id = ?", (task_id,))
+
+    connection.execute(
+        """
+        INSERT INTO task_study_guides (task_id, resource_title, overview, created_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (task_id, study_guide["resourceTitle"], study_guide["overview"], now),
+    )
+
+    connection.executemany(
+        """
+        INSERT INTO task_study_sections (task_id, section_order, section_title, content, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                task_id,
+                index,
+                section["sectionTitle"],
+                section["content"],
+                now,
+            )
+            for index, section in enumerate(study_guide["sections"], start=1)
+        ],
+    )
+
+    connection.executemany(
+        """
+        INSERT INTO task_study_references (
+            task_id, highlight_id, concept_title, textbook_excerpt, explanation, review_points_json, created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                task_id,
+                reference["highlightId"],
+                reference["conceptTitle"],
+                reference["textbookExcerpt"],
+                reference["explanation"],
+                json.dumps(reference["reviewPoints"]),
+                now,
+            )
+            for reference in study_guide["references"]
+        ],
+    )
+
+
+def load_study_guide(connection: Any, task_id: str) -> dict[str, Any] | None:
+    guide_row = connection.execute(
+        """
+        SELECT resource_title, overview
+        FROM task_study_guides
+        WHERE task_id = ?
+        """,
+        (task_id,),
+    ).fetchone()
+    if guide_row is None:
+        return None
+
+    sections = connection.execute(
+        """
+        SELECT section_title, content
+        FROM task_study_sections
+        WHERE task_id = ?
+        ORDER BY section_order ASC
+        """,
+        (task_id,),
+    ).fetchall()
+
+    references = connection.execute(
+        """
+        SELECT highlight_id, concept_title, textbook_excerpt, explanation, review_points_json
+        FROM task_study_references
+        WHERE task_id = ?
+        ORDER BY highlight_id ASC
+        """,
+        (task_id,),
+    ).fetchall()
+
+    return {
+        "resourceTitle": guide_row["resource_title"],
+        "overview": guide_row["overview"],
+        "sections": [
+            {
+                "sectionTitle": section["section_title"],
+                "content": section["content"],
+            }
+            for section in sections
+        ],
+        "references": [
+            {
+                "highlightId": reference["highlight_id"],
+                "conceptTitle": reference["concept_title"],
+                "textbookExcerpt": reference["textbook_excerpt"],
+                "explanation": reference["explanation"],
+                "reviewPoints": json.loads(reference["review_points_json"]),
+            }
+            for reference in references
+        ],
+    }
+
+
+def ensure_study_guide(connection: Any, task: dict[str, Any]) -> dict[str, Any]:
+    existing = load_study_guide(connection, task["id"])
+    if existing is not None:
+        return existing
+
+    highlights = fetch_highlights_for_task(connection, task["id"])
+    study_guide = build_simulated_study_guide(
+        title=task["title"],
+        subject=task["subject"],
+        source_text=task["source_text"],
+        highlights=highlights,
+    )
+    store_study_guide(connection, task["id"], study_guide)
+    return study_guide
 
 
 def build_content_html(paragraphs: list[str], highlights: list[dict[str, Any]]) -> str:
@@ -289,7 +443,8 @@ def get_student_tasks(
                 tasks.subject,
                 tasks.title,
                 tasks.total_errors,
-                COUNT(CASE WHEN annotations.is_correct = 1 THEN 1 END) AS found_errors
+                COUNT(CASE WHEN annotations.is_correct = 1 THEN 1 END) AS found_errors,
+                COUNT(annotations.id) AS submitted_count
             FROM tasks
             LEFT JOIN annotations
                 ON annotations.task_id = tasks.id
@@ -304,7 +459,8 @@ def get_student_tasks(
     data: list[dict[str, Any]] = []
     for row in rows:
         found_errors = row["found_errors"] or 0
-        task_status = "completed" if found_errors >= row["total_errors"] else "pending"
+        submitted_count = row["submitted_count"] or 0
+        task_status = "completed" if submitted_count >= row["total_errors"] else "pending"
         if status and task_status != status:
             continue
         data.append(
@@ -342,16 +498,25 @@ def get_student_task_detail(task_id: str, user: dict[str, Any] = Depends(get_cur
                     WHERE annotations.task_id = task_highlights.task_id
                       AND annotations.highlight_id = task_highlights.highlight_id
                       AND annotations.student_id = ?
+                ) AS is_submitted,
+                EXISTS(
+                    SELECT 1
+                    FROM annotations
+                    WHERE annotations.task_id = task_highlights.task_id
+                      AND annotations.highlight_id = task_highlights.highlight_id
+                      AND annotations.student_id = ?
                       AND annotations.is_correct = 1
                 ) AS is_resolved
             FROM task_highlights
             WHERE task_highlights.task_id = ?
             ORDER BY task_highlights.highlight_id
             """,
-            (user["id"], task_id),
+            (user["id"], user["id"], task_id),
         ).fetchall()
+        study_guide = ensure_study_guide(connection, dict(task))
 
     found_errors = sum(1 for highlight in highlights if highlight["is_resolved"])
+    submitted_count = sum(1 for highlight in highlights if highlight["is_submitted"])
     return {
         "taskId": task["id"],
         "title": task["title"],
@@ -360,12 +525,15 @@ def get_student_task_detail(task_id: str, user: dict[str, Any] = Depends(get_cur
             {
                 "highlightId": highlight["highlight_id"],
                 "text": highlight["text"],
+                "isSubmitted": bool(highlight["is_submitted"]),
                 "isResolved": bool(highlight["is_resolved"]),
             }
             for highlight in highlights
         ],
         "foundErrors": found_errors,
+        "submittedCount": submitted_count,
         "totalErrors": task["total_errors"],
+        "studyGuide": study_guide,
     }
 
 
@@ -572,6 +740,13 @@ def generate_task_draft(
                 for item in result["highlights"]
             ],
         )
+        study_guide = build_simulated_study_guide(
+            title=payload.title,
+            subject=payload.subject,
+            source_text=payload.sourceText,
+            highlights=result["highlights"],
+        )
+        store_study_guide(connection, task_id, study_guide)
 
     return {
         "taskId": task_id,
@@ -582,6 +757,7 @@ def generate_task_draft(
         "highlights": result["highlights"],
         "totalErrors": len(result["highlights"]),
         "status": "Draft",
+        "studyGuide": study_guide,
     }
 
 

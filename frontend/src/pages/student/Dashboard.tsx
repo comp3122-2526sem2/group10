@@ -1,20 +1,24 @@
 import { useEffect, useState } from 'react';
 import { Target, UserCircle, Files, Star, ArrowRight } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
-import { fetchPendingTasks, fetchStudentProfile, type TaskItem, type StudentProfile } from '../../api/mock';
+import { fetchCompletedTasks, fetchPendingTasks, fetchStudentProfile, type TaskItem, type StudentProfile } from '../../api/mock';
 
 function StudentDashboard() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<TaskItem[]>([]);
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     fetchStudentProfile().then(setProfile).catch(console.error);
 
-    // [API_TODO] CONTRACT_ENDPOINT: GET /api/v1/student/tasks?status=pending
     fetchPendingTasks().then(setTasks).catch((error) => {
       console.error('Failed to fetch pending tasks', error);
+    });
+
+    fetchCompletedTasks().then(setCompletedTasks).catch((error) => {
+      console.error('Failed to fetch completed tasks', error);
     });
   }, []);
 
@@ -92,6 +96,36 @@ function StudentDashboard() {
               )}
             </div>
             ))}
+          </div>
+        </section>
+
+        <section className="mt-12">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <Files className="text-violet-600" /> Review Ready
+            </h3>
+          </div>
+
+          <div className="grid gap-4">
+            {completedTasks.length ? completedTasks.map((task) => (
+              <div key={task.id} className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm flex justify-between items-center hover:shadow-md transition">
+                <div>
+                  <p className="text-xs font-semibold text-emerald-600 mb-2 uppercase tracking-wider">{task.subject}</p>
+                  <h4 className="text-xl font-bold text-gray-900 mb-2">{task.title}</h4>
+                  <p className="text-sm text-gray-500">You have submitted every annotation for this task. Open your review guide and recovery notes.</p>
+                </div>
+                <button
+                  onClick={() => navigate(`/student/review/${task.id}`)}
+                  className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-emerald-700 transition shadow-sm hover:shadow-md flex items-center gap-2"
+                >
+                  Open Review <ArrowRight weight="bold" />
+                </button>
+              </div>
+            )) : (
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 text-gray-500">
+                The review page unlocks as soon as you submit all annotations for one task on your own account.
+              </div>
+            )}
           </div>
         </section>
       </main>

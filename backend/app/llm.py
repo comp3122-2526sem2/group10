@@ -253,3 +253,90 @@ def _mutate_sentence(sentence: str, index: int) -> tuple[str, str, str]:
         "AI Hallucination",
         "The added claim about personal smartphones is invented and not supported by the source.",
     )
+
+
+def build_simulated_study_guide(
+    *,
+    title: str,
+    subject: str,
+    source_text: str,
+    highlights: list[dict[str, Any]],
+) -> dict[str, Any]:
+    base_sentences = _split_sentences(source_text)
+    if not base_sentences:
+        base_sentences = [f"{title} introduces core ideas in {subject}."]
+
+    chunk_size = max(1, (len(base_sentences) + 2) // 3)
+    section_titles = [
+        "Core Concepts",
+        "Cause And Effect",
+        "Exam Review Notes",
+    ]
+
+    sections: list[dict[str, str]] = []
+    for index, start in enumerate(range(0, len(base_sentences), chunk_size)):
+        chunk = " ".join(base_sentences[start:start + chunk_size]).strip()
+        if not chunk:
+            continue
+        sections.append(
+            {
+                "sectionTitle": section_titles[min(index, len(section_titles) - 1)],
+                "content": chunk,
+            }
+        )
+
+    references: list[dict[str, Any]] = []
+    for highlight in highlights:
+        excerpt = _find_best_reference_sentence(
+            sentences=base_sentences,
+            target_text=f"{highlight.get('text', '')} {highlight.get('canonicalReason', '')}",
+        )
+        concept_title = _build_concept_title(excerpt, subject)
+        review_points = [
+            f"Textbook anchor: {excerpt}",
+            f"Why the AI was wrong: {highlight.get('canonicalReason', '')}",
+            f"Review tip: compare the original concept with the flawed claim before answering exam questions.",
+        ]
+        references.append(
+            {
+                "highlightId": int(highlight["highlightId"]),
+                "conceptTitle": concept_title,
+                "textbookExcerpt": excerpt,
+                "explanation": str(highlight.get("explanation") or highlight.get("canonicalReason") or "").strip(),
+                "reviewPoints": review_points,
+            }
+        )
+
+    return {
+        "resourceTitle": f"{subject} Quick Review Notes",
+        "overview": (
+            f"These simulated lecture notes summarise the trustworthy textbook ideas behind {title}. "
+            "Use them to revisit the concepts you missed and turn each AI mistake into a revision entry point."
+        ),
+        "sections": sections,
+        "references": references,
+    }
+
+
+def _find_best_reference_sentence(*, sentences: list[str], target_text: str) -> str:
+    target_words = set(re.findall(r"[a-zA-Z]{4,}", target_text.lower()))
+    best_sentence = sentences[0]
+    best_score = -1
+
+    for sentence in sentences:
+        sentence_words = set(re.findall(r"[a-zA-Z]{4,}", sentence.lower()))
+        score = len(target_words & sentence_words)
+        if score > best_score:
+            best_score = score
+            best_sentence = sentence
+
+    return best_sentence
+
+
+def _build_concept_title(sentence: str, subject: str) -> str:
+    words = [word for word in re.findall(r"[A-Za-z]+", sentence) if len(word) > 2]
+    if not words:
+        return f"{subject} checkpoint"
+
+    title_words = words[:4]
+    return " ".join(word.capitalize() for word in title_words)

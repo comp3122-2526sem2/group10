@@ -72,6 +72,37 @@ def init_db() -> None:
                 FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
             );
 
+            CREATE TABLE IF NOT EXISTS task_study_guides (
+                task_id TEXT PRIMARY KEY,
+                resource_title TEXT NOT NULL,
+                overview TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS task_study_sections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id TEXT NOT NULL,
+                section_order INTEGER NOT NULL,
+                section_title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS task_study_references (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id TEXT NOT NULL,
+                highlight_id INTEGER NOT NULL,
+                concept_title TEXT NOT NULL,
+                textbook_excerpt TEXT NOT NULL,
+                explanation TEXT NOT NULL,
+                review_points_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(task_id, highlight_id),
+                FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS annotations (
                 id TEXT PRIMARY KEY,
                 task_id TEXT NOT NULL,

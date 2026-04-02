@@ -58,6 +58,11 @@ export const fetchPendingTasks = async (): Promise<TaskItem[]> => {
   return response.data;
 };
 
+export const fetchCompletedTasks = async (): Promise<TaskItem[]> => {
+  const response = await request<{ data: TaskItem[] }>('/student/tasks?status=completed');
+  return response.data;
+};
+
 export interface StudentTaskDetail {
   taskId: string;
   title: string;
@@ -65,10 +70,27 @@ export interface StudentTaskDetail {
   highlights: Array<{
     highlightId: number;
     text: string;
+    isSubmitted: boolean;
     isResolved: boolean;
   }>;
   foundErrors: number;
+  submittedCount: number;
   totalErrors: number;
+  studyGuide: {
+    resourceTitle: string;
+    overview: string;
+    sections: Array<{
+      sectionTitle: string;
+      content: string;
+    }>;
+    references: Array<{
+      highlightId: number;
+      conceptTitle: string;
+      textbookExcerpt: string;
+      explanation: string;
+      reviewPoints: string[];
+    }>;
+  };
 }
 
 export const fetchStudentTaskDetail = async (taskId: string): Promise<StudentTaskDetail> => {
@@ -161,6 +183,21 @@ export interface GeneratedDraft {
   }>;
   totalErrors: number;
   status: string;
+  studyGuide: {
+    resourceTitle: string;
+    overview: string;
+    sections: Array<{
+      sectionTitle: string;
+      content: string;
+    }>;
+    references: Array<{
+      highlightId: number;
+      conceptTitle: string;
+      textbookExcerpt: string;
+      explanation: string;
+      reviewPoints: string[];
+    }>;
+  };
 }
 
 export const generateFlawedText = async (payload: {
