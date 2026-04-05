@@ -280,7 +280,7 @@ export const login = async (payload: { email: string; password: string }) => {
 };
 
 export const register = async (payload: { email: string; password: string; name: string; role: string }) => {
-  return request<AuthResponse>('/auth/register', {
+  return request<AuthResponse>('/api/v1/auth/register', {
     method: 'POST',
     body: payload,
     auth: false,
