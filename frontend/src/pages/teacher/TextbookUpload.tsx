@@ -11,7 +11,7 @@ interface TextbookUploadProps {
   teacher_id: string;
 }
 
-export const TextbookUpload: React.FC<TextbookUploadProps> = ({ teacher_id }) => {
+export const TextbookUpload: React.FC<TextbookUploadProps> = ({ teacher_id: _teacher_id }) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [textbooks, setTextbooks] = useState<Textbook[]>([]);

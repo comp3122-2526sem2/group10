@@ -6,7 +6,7 @@ interface TaskFormWithTextbookProps {
 }
 
 export const TaskFormWithTextbook: React.FC<TaskFormWithTextbookProps> = ({ 
-  teacher_id, 
+  teacher_id: _teacher_id, 
   onTaskCreated 
 }) => {
   const [textbooks, setTextbooks] = useState<any[]>([]);
