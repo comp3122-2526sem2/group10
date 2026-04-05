@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Target, UserCircle, Robot, PencilSimpleLine, X, CaretDown, CheckCircle, CursorText, ArrowLeft, Spinner, Star } from '@phosphor-icons/react';
+import { Target, UserCircle, Robot, PencilSimpleLine, X, CaretDown, CheckCircle, CursorText, ArrowLeft, Spinner, Star, BookOpen } from '@phosphor-icons/react';
 import { useNavigate, useParams } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import { fetchStudentTaskDetail, submitAnnotation, type StudentTaskDetail } from '../../api/mock';
 
+// Extended type to include textbook info
+interface ExtendedStudentTaskDetail extends StudentTaskDetail {
+  textbook_id?: number;
+  chapter_id?: number;
+}
+
 function Workspace() {
   const navigate = useNavigate();
   const { taskId = 'task-1' } = useParams();
-  const [taskDetail, setTaskDetail] = useState<StudentTaskDetail | null>(null);
+  const [taskDetail, setTaskDetail] = useState<ExtendedStudentTaskDetail | null>(null);
   const [selectedHighlight, setSelectedHighlight] = useState<number | null>(null);
   const [annotation, setAnnotation] = useState('');
   const [errorType, setErrorType] = useState('Logical Error');
@@ -18,6 +24,9 @@ function Workspace() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  // NEW: State for textbook PDF URL
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const totalErrors = taskDetail?.totalErrors ?? 0;
 
@@ -26,7 +35,7 @@ function Workspace() {
     setLoadError('');
 
     fetchStudentTaskDetail(taskId)
-      .then((detail) => {
+      .then(async (detail) => {
         const preResolved = detail.highlights
           .filter((item) => item.isResolved)
           .map((item) => item.highlightId);
@@ -37,6 +46,22 @@ function Workspace() {
         setTaskDetail(detail);
         setResolved(preResolved);
         setSubmitted(preSubmitted);
+
+        // NEW: Check if task has textbook reference and fetch PDF URL
+        if ((detail as ExtendedStudentTaskDetail).textbook_id) {
+          setPdfLoading(true);
+          const textbookId = (detail as ExtendedStudentTaskDetail).textbook_id;
+          try {
+            // Get the PDF download URL
+            const url = `http://localhost:8000/api/v1/textbooks/${textbookId}/download`;
+            // We'll just store the URL - the actual fetch happens when user clicks
+            setPdfUrl(url);
+          } catch (error) {
+            console.error('Failed to get textbook URL:', error);
+          } finally {
+            setPdfLoading(false);
+          }
+        }
 
         if (detail.submittedCount >= detail.totalErrors) {
           navigate(`/student/review/${taskId}`, { replace: true });
@@ -221,11 +246,56 @@ function Workspace() {
                 {loadError}
               </div>
             ) : (
-              <div
-                className="space-y-6 text-lg leading-relaxed text-gray-800 workspace-content"
-                onClick={handleContentClick}
-                dangerouslySetInnerHTML={{ __html: renderedContentHtml }}
-              />
+              <>
+                {/* NEW: Textbook Reference Card */}
+                {pdfUrl && (
+                  <div className="mb-6 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-5 shadow-sm animate-fade-in-up">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center shrink-0">
+                        <BookOpen size={24} className="text-violet-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                          📖 Textbook Reference Available
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          This task was created from a textbook chapter. Use the original textbook to verify facts and find correct information!
+                        </p>
+                        <a
+                          href={pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-xl transition shadow-sm"
+                          onClick={(e) => {
+                            if (pdfLoading) {
+                              e.preventDefault();
+                              alert('Loading textbook... Please wait.');
+                            }
+                          }}
+                        >
+                          {pdfLoading ? (
+                            <Spinner size={16} className="animate-spin" />
+                          ) : (
+                            <BookOpen size={16} />
+                          )}
+                          Open Original Textbook PDF
+                        </a>
+                        {(taskDetail as ExtendedStudentTaskDetail).chapter_id && (
+                          <p className="text-xs text-gray-500 mt-2">
+                            💡 Tip: This task is based on a specific chapter. Check the relevant pages in the textbook.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  className="space-y-6 text-lg leading-relaxed text-gray-800 workspace-content"
+                  onClick={handleContentClick}
+                  dangerouslySetInnerHTML={{ __html: renderedContentHtml }}
+                />
+              </>
             )}
           </div>
         </section>

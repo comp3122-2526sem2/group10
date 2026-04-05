@@ -145,8 +145,56 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (classroom_id) REFERENCES classrooms(id) ON DELETE CASCADE
             );
+
+            -- ============================================================
+            -- NEW TABLES FOR TEXTBOOK FEATURE
+            -- ============================================================
+            
+            CREATE TABLE IF NOT EXISTS textbooks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                teacher_id TEXT NOT NULL,
+                filename TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                total_pages INTEGER,
+                uploaded_at TEXT NOT NULL,
+                FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS textbook_chapters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                textbook_id INTEGER NOT NULL,
+                chapter_number INTEGER,
+                chapter_title TEXT,
+                start_page INTEGER NOT NULL,
+                end_page INTEGER NOT NULL,
+                extracted_text TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (textbook_id) REFERENCES textbooks(id) ON DELETE CASCADE
+            );
+
+            -- ============================================================
+            -- MODIFY tasks TABLE - ADD textbook columns
+            -- ============================================================
+            -- Note: SQLite doesn't support ALTER TABLE ADD COLUMN IF NOT EXISTS
+            -- We'll check and add columns manually in Python
             """
         )
+        
+        # Add textbook columns to tasks table if they don't exist
+        cursor = connection.cursor()
+        
+        # Check and add textbook_id column
+        cursor.execute("PRAGMA table_info(tasks)")
+        existing_columns = [col[1] for col in cursor.fetchall()]
+        
+        if "textbook_id" not in existing_columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN textbook_id INTEGER REFERENCES textbooks(id)")
+        
+        if "chapter_id" not in existing_columns:
+            cursor.execute("ALTER TABLE tasks ADD COLUMN chapter_id INTEGER REFERENCES textbook_chapters(id)")
+        
+        connection.commit()
 
 
 def seed_classrooms() -> None:

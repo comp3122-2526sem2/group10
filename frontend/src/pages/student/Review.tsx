@@ -40,7 +40,7 @@ function ReviewPage() {
   const reviewReady = !!taskDetail && taskDetail.submittedCount >= taskDetail.totalErrors;
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
+    <div className="h-screen flex flex-col bg-gray-50 font-sans text-gray-800 overflow-hidden">
       <header className="bg-white border-b border-gray-200 px-8 h-[72px] flex justify-between items-center w-full">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/student/dashboard')} className="text-gray-400 hover:text-violet-600 transition">
@@ -66,7 +66,7 @@ function ReviewPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-8 py-10">
+      <main className="flex-1 overflow-y-auto max-w-6xl mx-auto px-8 py-10 scrollbar-hide">
         {isLoading ? (
           <div className="rounded-2xl border border-gray-200 bg-white px-6 py-5 text-gray-600">Loading review guide...</div>
         ) : error ? (

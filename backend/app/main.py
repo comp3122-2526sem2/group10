@@ -7,7 +7,7 @@ import re
 from typing import Any
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,7 @@ from .llm import (
     judge_annotation,
 )
 
+from . import textbook_service
 
 bootstrap()
 
@@ -358,6 +359,32 @@ class TeacherAssignPayload(BaseModel):
 
 class InviteStudentsPayload(BaseModel):
     emails: list[str]
+
+# Textbook
+
+class TextbookUploadResponse(BaseModel):
+    textbook_id: int
+    message: str
+
+class TextbookChapterResponse(BaseModel):
+    id: int
+    chapter_number: int | None
+    chapter_title: str | None
+    start_page: int
+    end_page: int
+
+class TextbookInfo(BaseModel):
+    id: int
+    original_name: str
+    uploaded_at: str
+    total_pages: int | None
+
+class GenerateFromTextbookPayload(BaseModel):
+    title: str
+    subject: str
+    textbook_id: int
+    chapter_id: int
+    hallucination_density: int = Field(default=2, ge=1, le=3)
 
 
 @app.get("/api/v1/health")
@@ -1011,6 +1038,362 @@ def get_blindspot_heatmap(task_id: str, user: dict[str, Any] = Depends(get_curre
         "title": task["title"],
         "blindspots": blindspots,
     }
+
+# ============================================================
+# TEXTBOOK MANAGEMENT ENDPOINTS (Teacher)
+# ============================================================
+
+@app.post("/api/v1/teacher/textbooks/upload")
+async def upload_textbook(
+    file: UploadFile = File(...),
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Teacher uploads a PDF textbook"""
+    require_role(user, {"teacher", "admin"})
+    
+    # Always use the authenticated user's ID
+    teacher_id = user["id"]
+    
+    if not file.filename or not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files allowed")
+    
+    try:
+        contents = await file.read()
+        textbook_id = await textbook_service.save_textbook(
+            teacher_id=teacher_id,
+            file_bytes=contents,
+            original_filename=file.filename
+        )
+        
+        return {
+            "textbook_id": textbook_id,
+            "message": f"Textbook '{file.filename}' uploaded successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload textbook: {str(e)}")
+
+
+@app.get("/api/v1/teacher/textbooks")
+def get_my_textbooks(
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Get all textbooks uploaded by the current teacher"""
+    require_role(user, {"teacher", "admin"})
+    
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, original_name, uploaded_at, total_pages
+            FROM textbooks
+            WHERE teacher_id = ?
+            ORDER BY uploaded_at DESC
+            """,
+            (user["id"],),
+        ).fetchall()
+    
+    textbooks = [
+        {
+            "id": row["id"],
+            "original_name": row["original_name"],
+            "uploaded_at": row["uploaded_at"],
+            "total_pages": row["total_pages"],
+        }
+        for row in rows
+    ]
+    
+    return {"textbooks": textbooks}
+
+
+@app.get("/api/v1/textbooks/{textbook_id}/chapters")
+def get_textbook_chapters(
+    textbook_id: int,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Get all chapters for a textbook (accessible to teachers and students)"""
+    require_role(user, {"teacher", "student", "admin"})
+    
+    with get_connection() as conn:
+        # Verify textbook exists
+        textbook = conn.execute(
+            "SELECT id, original_name FROM textbooks WHERE id = ?",
+            (textbook_id,),
+        ).fetchone()
+        
+        if textbook is None:
+            raise HTTPException(status_code=404, detail="Textbook not found")
+        
+        # Use DISTINCT to prevent duplicates
+        rows = conn.execute(
+            """
+            SELECT DISTINCT id, chapter_number, chapter_title, start_page, end_page
+            FROM textbook_chapters
+            WHERE textbook_id = ?
+            ORDER BY chapter_number NULLS LAST, start_page ASC
+            """,
+            (textbook_id,),
+        ).fetchall()
+    
+    chapters = [
+        {
+            "id": row["id"],
+            "chapter_number": row["chapter_number"],
+            "chapter_title": row["chapter_title"],
+            "start_page": row["start_page"],
+            "end_page": row["end_page"],
+        }
+        for row in rows
+    ]
+    
+    return {
+        "textbook_id": textbook_id,
+        "textbook_name": textbook["original_name"],
+        "chapters": chapters,
+    }
+
+
+@app.post("/api/v1/teacher/tasks/from-textbook")
+def create_task_from_textbook(
+    payload: GenerateFromTextbookPayload,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Create a new task using a textbook chapter as source material"""
+    require_role(user, {"teacher", "admin"})
+    
+    # Get the chapter text
+    with get_connection() as conn:
+        chapter = conn.execute(
+            """
+            SELECT tc.*, t.teacher_id, t.original_name as textbook_name
+            FROM textbook_chapters tc
+            JOIN textbooks t ON t.id = tc.textbook_id
+            WHERE tc.id = ?
+            """,
+            (payload.chapter_id,),
+        ).fetchone()
+        
+        if chapter is None:
+            raise HTTPException(status_code=404, detail="Chapter not found")
+        
+        if user["role"] != "admin" and chapter["teacher_id"] != user["id"]:
+            raise HTTPException(status_code=403, detail="You don't own this textbook")
+        
+        full_text = chapter["extracted_text"]
+        
+        import random
+        import re
+        
+        # Split into sentences
+        sentences = re.split(r'(?<=[.!?])\s+', full_text)
+        # Filter out empty/short sentences
+        sentences = [s.strip() for s in sentences if len(s.strip()) > 30]
+        
+        if len(sentences) >= 3:
+            # Pick random starting sentence
+            max_start = len(sentences) - 3
+            start_idx = random.randint(0, max_start)
+            # Take 2-4 sentences
+            num_sentences = random.randint(10,12)
+            selected = sentences[start_idx:start_idx + num_sentences]
+            chapter_text = ' '.join(selected)
+        else:
+            # If not enough sentences, just take first 300 chars
+            chapter_text = full_text[:300]
+            last_space = chapter_text.rfind(' ')
+            if last_space > 100:
+                chapter_text = chapter_text[:last_space] + "..."
+        
+        chapter_ref = f"Random passage from chapter"
+    
+    # Generate flawed passage using the randomly selected passage
+    try:
+        raw_result = generate_flawed_task(
+            title=payload.title,
+            subject=payload.subject,
+            source_text=chapter_text,
+            error_density=payload.hallucination_density,
+        )
+        result = ensure_valid_generation(raw_result, payload.hallucination_density)
+        content_html = build_content_html(result["paragraphs"], result["highlights"])
+    except (LLMError, ValueError) as e:
+        result = fallback_generate_flawed_task(
+            source_text=chapter_text,
+            error_density=payload.hallucination_density,
+        )
+        content_html = build_content_html(result["paragraphs"], result["highlights"])
+    
+    # Create the task with textbook references
+    task_id = make_id("task")
+    generated_text = "\n\n".join(result["paragraphs"])
+    
+    with get_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO tasks (
+                id, title, subject, source_text, content_html,
+                status, error_density, created_by, total_errors, created_at,
+                textbook_id, chapter_id
+            )
+            VALUES (?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                task_id,
+                payload.title,
+                payload.subject,
+                chapter_text,
+                content_html,
+                payload.hallucination_density,
+                user["id"],
+                len(result["highlights"]),
+                utc_now(),
+                payload.textbook_id,
+                payload.chapter_id,
+            ),
+        )
+        
+        # Store highlights
+        connection.executemany(
+            """
+            INSERT INTO task_highlights (
+                task_id, highlight_id, text, error_type, canonical_reason,
+                explanation, is_golden, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (
+                    task_id,
+                    item["highlightId"],
+                    item["text"],
+                    item["errorType"],
+                    item["canonicalReason"],
+                    item["explanation"],
+                    int(item["isGolden"]),
+                    utc_now(),
+                )
+                for item in result["highlights"]
+            ],
+        )
+        
+        # Generate and store study guide
+        study_guide = build_simulated_study_guide(
+            title=payload.title,
+            subject=payload.subject,
+            source_text=chapter_text,
+            highlights=result["highlights"],
+        )
+        store_study_guide(connection, task_id, study_guide)
+    
+    return {
+        "taskId": task_id,
+        "title": payload.title,
+        "subject": payload.subject,
+        "generatedText": generated_text,
+        "contentHtml": content_html,
+        "highlights": result["highlights"],
+        "totalErrors": len(result["highlights"]),
+        "status": "Draft",
+        "studyGuide": study_guide,
+        "textbookInfo": {
+            "textbook_id": payload.textbook_id,
+            "chapter_id": payload.chapter_id,
+            "chapter_ref": chapter_ref,
+        },
+    }
+
+
+@app.get("/api/v1/textbooks/{textbook_id}/download")
+def download_textbook(
+    textbook_id: int,
+    user: dict[str, Any] = Depends(get_current_user),
+):
+    """Download the original PDF textbook (for students to reference)"""
+    require_role(user, {"teacher", "student", "admin"})
+    
+    from fastapi.responses import FileResponse
+    
+    with get_connection() as conn:
+        textbook = conn.execute(
+            """
+            SELECT file_path, original_name, teacher_id
+            FROM textbooks
+            WHERE id = ?
+            """,
+            (textbook_id,),
+        ).fetchone()
+        
+        if textbook is None:
+            raise HTTPException(status_code=404, detail="Textbook not found")
+        
+        # Students can only download if the textbook is linked to a published task they have access to
+        if user["role"] == "student":
+            task_link = conn.execute(
+                """
+                SELECT 1 FROM tasks
+                WHERE textbook_id = ? AND status = 'published'
+                """,
+                (textbook_id,),
+            ).fetchone()
+            
+            if not task_link:
+                raise HTTPException(status_code=403, detail="You don't have access to this textbook")
+    
+    file_path = textbook["file_path"]
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Textbook file not found")
+    
+    return FileResponse(
+        path=file_path,
+        filename=textbook["original_name"],
+        media_type='application/pdf',
+        headers={
+            "Content-Disposition": f"inline; filename={textbook['original_name']}"
+        }
+    )
+
+
+@app.delete("/api/v1/teacher/textbooks/{textbook_id}")
+def delete_textbook(
+    textbook_id: int,
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Delete a textbook and all its chapters"""
+    require_role(user, {"teacher", "admin"})
+    
+    with get_connection() as conn:
+        # Verify ownership
+        textbook = conn.execute(
+            "SELECT file_path, teacher_id FROM textbooks WHERE id = ?",
+            (textbook_id,),
+        ).fetchone()
+        
+        if textbook is None:
+            raise HTTPException(status_code=404, detail="Textbook not found")
+        
+        if user["role"] != "admin" and textbook["teacher_id"] != user["id"]:
+            raise HTTPException(status_code=403, detail="You don't own this textbook")
+        
+        # Check if textbook is used in any published tasks
+        used_in_tasks = conn.execute(
+            "SELECT COUNT(*) as count FROM tasks WHERE textbook_id = ? AND status = 'published'",
+            (textbook_id,),
+        ).fetchone()
+        
+        if used_in_tasks["count"] > 0:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Cannot delete textbook used in {used_in_tasks['count']} published task(s)"
+            )
+        
+        # Delete the file
+        file_path = textbook["file_path"]
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        # Delete from database (cascade will delete chapters)
+        conn.execute("DELETE FROM textbooks WHERE id = ?", (textbook_id,))
+        conn.commit()
+    
+    return {"success": True, "message": "Textbook deleted successfully"}
 
 
 @app.get("/api/v1/admin/classrooms")

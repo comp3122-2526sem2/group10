@@ -5,6 +5,7 @@ import os
 import re
 import urllib.error
 import urllib.request
+import random
 from typing import Any
 
 
@@ -113,7 +114,6 @@ Source material:
 """
     return _call_ollama(prompt=prompt, system=system)
 
-
 def judge_annotation(
     *,
     title: str,
@@ -149,7 +149,6 @@ Grading rules:
 - If the explanation is vague, off-topic, or contradicts the canonical explanation, mark false.
 """
     return _call_ollama(prompt=prompt, system=system)
-
 
 def fallback_generate_flawed_task(
     *,
@@ -206,54 +205,110 @@ def _split_sentences(text: str) -> list[str]:
 
 
 def _mutate_sentence(sentence: str, index: int) -> tuple[str, str, str]:
-    numeric_match = re.search(r"\b(\d{3,4})\b", sentence)
-    if numeric_match:
-        original = numeric_match.group(1)
-        replacement = str(int(original) + 120)
-        return (
-            sentence.replace(original, replacement, 1),
-            "Factual Error",
-            f"The original source does not support the changed year or number {replacement}.",
-        )
-
-    if "century" in sentence.lower():
-        mutated = re.sub(r"late 18th century", "late 15th century", sentence, flags=re.IGNORECASE)
-        if mutated != sentence:
-            return (
-                mutated,
-                "Factual Error",
-                "The timing is wrong. The Industrial Revolution began in the late 18th century, not the late 15th century.",
-            )
-
-    replacements = [
-        ("Britain", "France", "Factual Error", "The source identifies Britain as the starting point, not France."),
-        ("steam power", "solar power", "AI Hallucination", "Steam power was central in the original material, while solar power is an invented substitution here."),
-        ("mechanization", "manual copying", "Logical Error", "The sentence reverses the role of mechanization in industrial production."),
-        ("global trade", "strict local isolation", "Logical Error", "The source says the Industrial Revolution expanded trade rather than isolating markets."),
-        ("urbanization", "mass return to isolated farms", "AI Hallucination", "This inserts a claim that contradicts the source and reads like an unsupported hallucination."),
+    # Cycle through error types
+    error_types = ["Factual Error", "Logical Error", "AI Hallucination"]
+    error_type = error_types[index % 3]
+    
+    # 1. Flip logical words (works for any subject)
+    logical_pairs = [
+        ("always", "never"),
+        ("all", "none"),
+        ("increases", "decreases"),
+        ("before", "after"),
+        ("more", "less"),
+        ("same", "different"),
+        ("true", "false"),
+        ("correct", "incorrect"),
+        ("high", "low"),
+        ("fast", "slow"),
+        ("connected", "disconnected"),
+        ("together", "separately"),
     ]
-
-    replacement = replacements[index % len(replacements)]
-    if replacement[0] in sentence:
+    for word1, word2 in logical_pairs:
+        if word1 in sentence.lower():
+            return (
+                sentence.replace(word1, word2, 1),
+                "Logical Error",
+                f"This reverses the correct relationship.",
+            )
+        if word2 in sentence.lower():
+            return (
+                sentence.replace(word2, word1, 1),
+                "Logical Error",
+                f"This reverses the correct relationship.",
+            )
+    
+    # 2. Negate the sentence
+    if " is " in sentence:
         return (
-            sentence.replace(replacement[0], replacement[1], 1),
-            replacement[2],
-            replacement[3],
-        )
-
-    if "transformed" in sentence:
-        return (
-            sentence.replace("transformed", "completely blocked", 1),
+            sentence.replace(" is ", " is not ", 1),
             "Logical Error",
-            "The source says the development transformed production, so saying it blocked change reverses the meaning.",
+            "This negates a correct statement.",
         )
-
+    
+    if " are " in sentence:
+        return (
+            sentence.replace(" are ", " are not ", 1),
+            "Logical Error",
+            "This negates a correct statement.",
+        )
+    
+    if " was " in sentence:
+        return (
+            sentence.replace(" was ", " was not ", 1),
+            "Logical Error",
+            "This negates a correct statement.",
+        )
+    
+    # 3. Change factual claims (names, places, relationships)
+    factual_pairs = [
+        ("client", "server"),
+        ("input", "output"),
+        ("source", "destination"),
+        ("sender", "receiver"),
+        ("encryption", "decryption"),
+        ("public", "private"),
+        ("local", "global"),
+        ("internal", "external"),
+    ]
+    for word1, word2 in factual_pairs:
+        if word1 in sentence.lower():
+            return (
+                sentence.replace(word1, word2, 1),
+                "Factual Error",
+                f"This misidentifies the correct term. The source says '{word1}', not '{word2}'.",
+            )
+        if word2 in sentence.lower():
+            return (
+                sentence.replace(word2, word1, 1),
+                "Factual Error",
+                f"This misidentifies the correct term.",
+            )
+    
+    # 4. Change amount/degree words
+    amount_words = [
+        ("majority", "minority"),
+        ("most", "few"),
+        ("many", "few"),
+        ("large", "small"),
+        ("significant", "insignificant"),
+        ("common", "rare"),
+        ("frequent", "infrequent"),
+    ]
+    for word1, word2 in amount_words:
+        if word1 in sentence.lower():
+            return (
+                sentence.replace(word1, word2, 1),
+                "Factual Error",
+                f"This misrepresents the actual frequency or amount.",
+            )
+    
+    # 5. Last resort - add a clear contradiction
     return (
-        sentence.rstrip(".") + " because it was first powered by personal smartphones.",
+        sentence.rstrip(".") + " This is incorrect.",
         "AI Hallucination",
-        "The added claim about personal smartphones is invented and not supported by the source.",
+        "This claim is not supported by the source material.",
     )
-
 
 def build_simulated_study_guide(
     *,

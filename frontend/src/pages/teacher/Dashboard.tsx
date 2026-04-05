@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Target, UserCircle, UploadSimple, ChalkboardTeacher, ChartBar, Flame, WarningCircle, Robot, TestTube, Spinner } from '@phosphor-icons/react';
+import { Target, UserCircle, UploadSimple, ChalkboardTeacher, ChartBar, Flame, WarningCircle, Robot, TestTube, Spinner, BookOpen } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 import {
   fetchBlindspotHeatmap,
@@ -11,6 +11,9 @@ import {
   type GeneratedDraft,
   type TeacherTask,
 } from '../../api/mock';
+// NEW IMPORTS for textbook features
+import { TextbookUpload } from './TextbookUpload';
+import { TaskFormWithTextbook } from './TaskFormWithTextbook';
 
 function TeacherDashboard() {
   const navigate = useNavigate();
@@ -18,7 +21,8 @@ function TeacherDashboard() {
   const [heatmapData, setHeatmapData] = useState<InsightReport | null>(null);
   const [overviewStats, setOverviewStats] = useState<{ activeStudents: number; avgFactCheckScore: number; generatedTasks: number } | null>(null);
   const [recentTasks, setRecentTasks] = useState<TeacherTask[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'generation' | 'analytics'>('overview');
+  // MODIFIED: Added 'textbooks' tab
+  const [activeTab, setActiveTab] = useState<'overview' | 'generation' | 'analytics' | 'textbooks'>('overview');
 
   const [taskTitle, setTaskTitle] = useState('New Fact-check Task');
   const [subject, setSubject] = useState('General');
@@ -28,6 +32,22 @@ function TeacherDashboard() {
   const [generatedDraft, setGeneratedDraft] = useState<GeneratedDraft | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState('');
+  
+  // NEW: Get teacher ID from localStorage or auth context
+  const [teacher_id, setTeacherId] = useState<string>('');
+
+  useEffect(() => {
+    // Get teacher ID from stored user data
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        setTeacherId(user.id);
+      } catch (e) {
+        console.error('Failed to parse user', e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -60,6 +80,7 @@ function TeacherDashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     navigate('/auth');
   };
 
@@ -117,6 +138,18 @@ function TeacherDashboard() {
     }
   };
 
+  // NEW: Handle task creation from textbook
+  const handleTaskCreatedFromTextbook = (taskId: string) => {
+    console.log('Task created:', taskId);
+    // Refresh tasks list
+    const loadTasks = async () => {
+      const tasks = await fetchRecentTasks();
+      setRecentTasks(tasks);
+    };
+    loadTasks();
+    setActiveTab('overview');
+  };
+
   return (
     <div className="h-screen bg-gray-50 font-sans text-gray-800 flex flex-col overflow-hidden">
       <header className="bg-white border-b border-gray-200 px-8 h-[72px] flex justify-between items-center shrink-0 w-full z-20">
@@ -153,6 +186,11 @@ function TeacherDashboard() {
             <button onClick={() => setActiveTab('generation')} className={`w-full flex items-center justify-start gap-4 font-semibold px-4 py-4 rounded-xl transition-all text-[15px] ${activeTab === 'generation' ? 'text-violet-700 bg-violet-50 border border-violet-100' : 'text-gray-600 hover:bg-gray-50 hover:text-violet-600'}`}>
               <UploadSimple size={24} />
               <span className="text-left leading-tight">Materials &<br/>Generation</span>
+            </button>
+            {/* NEW: Textbooks tab button */}
+            <button onClick={() => setActiveTab('textbooks')} className={`w-full flex items-center justify-start gap-4 font-semibold px-4 py-4 rounded-xl transition-all text-[15px] ${activeTab === 'textbooks' ? 'text-violet-700 bg-violet-50 border border-violet-100' : 'text-gray-600 hover:bg-gray-50 hover:text-violet-600'}`}>
+              <BookOpen size={24} />
+              <span className="text-left leading-tight">Textbooks</span>
             </button>
             <button onClick={() => setActiveTab('analytics')} className={`w-full flex items-center justify-start gap-4 font-semibold px-4 py-4 rounded-xl transition-all text-[15px] ${activeTab === 'analytics' ? 'text-violet-700 bg-violet-50 border border-violet-100' : 'text-gray-600 hover:bg-gray-50 hover:text-violet-600'}`}>
               <ChartBar size={24} />
@@ -236,6 +274,27 @@ function TeacherDashboard() {
                   </table>
                 </div>
               </>
+            )}
+
+            {/* Textbooks Tab Content */}
+            {activeTab === 'textbooks' && (
+              <div className="space-y-8">
+                <header className="mb-4">
+                  <h2 className="text-3xl font-bold text-gray-900">Textbook Management</h2>
+                  <p className="text-gray-500 mt-2">Upload PDF textbooks and create fact-check tasks from specific chapters.</p>
+                </header>
+                
+                {/* Textbook Upload Component */}
+                <TextbookUpload teacher_id={teacher_id} />
+                
+                {/* Create Task from Textbook Component */}
+                <div className="mt-8 pt-8 border-t border-gray-200">
+                  <TaskFormWithTextbook 
+                    teacher_id={teacher_id} 
+                    onTaskCreated={handleTaskCreatedFromTextbook}
+                  />
+                </div>
+              </div>
             )}
 
             {activeTab === 'generation' && (
