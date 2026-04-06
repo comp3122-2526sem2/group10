@@ -232,11 +232,11 @@ export interface Classroom {
 }
 
 export const fetchClassrooms = async (): Promise<Classroom[]> => {
-  return request<Classroom[]>('/admin/classrooms');
+  return request<Classroom[]>('/api/v1/admin/classrooms');
 };
 
 export const createClassroom = async (payload: { name: string }): Promise<Classroom> => {
-  return request<Classroom>('/admin/classrooms', {
+  return request<Classroom>('/api/v1/admin/classrooms', {
     method: 'POST',
     body: payload,
   });
