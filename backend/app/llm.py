@@ -9,8 +9,8 @@ import random
 from typing import Any
 
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
 
 class LLMError(RuntimeError):
@@ -29,40 +29,32 @@ def _extract_json_block(text: str) -> dict[str, Any]:
         raise LLMError("Model returned malformed JSON.") from error
 
 
-def _call_ollama(prompt: str, system: str) -> dict[str, Any]:
-    payload = json.dumps(
-        {
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "system": system,
-            "stream": False,
-            "format": "json",
-            "options": {
-                "temperature": 0.2,
-                "num_predict": 600,
-            },
-        }
-    ).encode("utf-8")
-
-    request = urllib.request.Request(
-        url=f"{OLLAMA_URL}/api/generate",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
+def _call_deepseek(prompt: str, system: str) -> dict[str, Any]:
+    """Call DeepSeek API"""
+    headers = {
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "deepseek-chat",  # Use deepseek-reasoner for R1 reasoning
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"}
+    }
+    
     try:
-        with urllib.request.urlopen(request, timeout=25) as response:
-            body = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError) as error:
-        raise LLMError(
-            "Unable to reach Ollama. Make sure Ollama is installed, running, and the model is pulled."
-        ) from error
-
-    if "response" not in body:
-        raise LLMError("Unexpected Ollama response payload.")
-
-    return _extract_json_block(body["response"])
+        response = requests.post(DEEPSEEK_API_URL, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+        result = response.json()
+        # Extract the JSON from the assistant's response
+        content = result["choices"][0]["message"]["content"]
+        return json.loads(content)
+    except Exception as e:
+        raise LLMError(f"DeepSeek API error: {e}")
 
 
 def generate_flawed_task(
@@ -112,7 +104,7 @@ Rules:
 Source material:
 {source_text}
 """
-    return _call_ollama(prompt=prompt, system=system)
+    return _call_deepseek(prompt=prompt, system=system)
 
 def judge_annotation(
     *,
@@ -148,7 +140,7 @@ Grading rules:
 - If the student selects the wrong error type but the reason is still clearly correct, you may still mark true.
 - If the explanation is vague, off-topic, or contradicts the canonical explanation, mark false.
 """
-    return _call_ollama(prompt=prompt, system=system)
+    return _call_deepseek(prompt=prompt, system=system)
 
 def fallback_generate_flawed_task(
     *,
