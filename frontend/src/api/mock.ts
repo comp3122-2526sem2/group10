@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE = 'https://debunk-ai-backend.onrender.com';
 
 type HttpMethod = 'GET' | 'POST';
 
@@ -50,16 +50,16 @@ export interface StudentProfile {
 }
 
 export const fetchStudentProfile = async (): Promise<StudentProfile> => {
-  return request<StudentProfile>('/auth/me');
+  return request<StudentProfile>('/api/v1/auth/me');
 };
 
 export const fetchPendingTasks = async (): Promise<TaskItem[]> => {
-  const response = await request<{ data: TaskItem[] }>('/student/tasks?status=pending');
+  const response = await request<{ data: TaskItem[] }>('/api/v1/student/tasks?status=pending');
   return response.data;
 };
 
 export const fetchCompletedTasks = async (): Promise<TaskItem[]> => {
-  const response = await request<{ data: TaskItem[] }>('/student/tasks?status=completed');
+  const response = await request<{ data: TaskItem[] }>('/api/v1/student/tasks?status=completed');
   return response.data;
 };
 
@@ -94,7 +94,7 @@ export interface StudentTaskDetail {
 }
 
 export const fetchStudentTaskDetail = async (taskId: string): Promise<StudentTaskDetail> => {
-  return request<StudentTaskDetail>(`/student/tasks/${taskId}`);
+  return request<StudentTaskDetail>(`/api/v1/student/tasks/${taskId}`);
 };
 
 export interface AnnotationPayload {
@@ -114,7 +114,7 @@ export interface AnnotationResponse {
 }
 
 export const submitAnnotation = async (payload: AnnotationPayload): Promise<AnnotationResponse> => {
-  return request<AnnotationResponse>('/student/annotations', {
+  return request<AnnotationResponse>('/api/v1/student/annotations', {
     method: 'POST',
     body: payload,
   });
@@ -133,7 +133,7 @@ export interface InsightReport {
 }
 
 export const fetchTeacherOverviewStats = async () => {
-  return request<{ activeStudents: number; avgFactCheckScore: number; generatedTasks: number }>('/teacher/overview');
+  return request<{ activeStudents: number; avgFactCheckScore: number; generatedTasks: number }>('/api/v1/teacher/overview');
 };
 
 export const fetchBlindspotHeatmap = async (taskId?: string): Promise<InsightReport> => {
@@ -149,7 +149,7 @@ export const fetchBlindspotHeatmap = async (taskId?: string): Promise<InsightRep
     }
     targetTaskId = tasks[0].id;
   }
-  return request<InsightReport>(`/teacher/reports/${targetTaskId}/heatmaps`);
+  return request<InsightReport>(`/api/v1/teacher/reports/${targetTaskId}/heatmaps`);
 };
 
 export interface TeacherTask {
@@ -162,7 +162,7 @@ export interface TeacherTask {
 }
 
 export const fetchRecentTasks = async (): Promise<TeacherTask[]> => {
-  const response = await request<{ data: TeacherTask[] }>('/teacher/tasks');
+  const response = await request<{ data: TeacherTask[] }>('/api/v1/teacher/tasks');
   return response.data;
 };
 
@@ -206,7 +206,7 @@ export const generateFlawedText = async (payload: {
   title?: string;
   subject?: string;
 }): Promise<GeneratedDraft> => {
-  return request<GeneratedDraft>('/teacher/generate-flaws', {
+  return request<GeneratedDraft>('/api/v1/teacher/generate-flaws', {
     method: 'POST',
     body: {
       sourceText: payload.sourceText,
@@ -218,7 +218,7 @@ export const generateFlawedText = async (payload: {
 };
 
 export const publishTask = async (payload: { taskId: string; title: string; subject: string }) => {
-  return request<{ success: boolean; taskId: string }>('/teacher/tasks', {
+  return request<{ success: boolean; taskId: string }>('/api/v1/teacher/tasks', {
     method: 'POST',
     body: payload,
   });
@@ -243,20 +243,20 @@ export const createClassroom = async (payload: { name: string }): Promise<Classr
 };
 
 export const assignTeacherToClassroom = async (classId: string, email: string) => {
-  return request<{ success: boolean }>(`/admin/classrooms/${classId}/teachers`, {
+  return request<{ success: boolean }>(`/api/v1/admin/classrooms/${classId}/teachers`, {
     method: 'POST',
     body: { email },
   });
 };
 
 export const refreshClassroomCode = async (classId: string): Promise<string> => {
-  return request<string>(`/admin/classrooms/${classId}/refresh-code`, {
+  return request<string>(`/api/v1/admin/classrooms/${classId}/refresh-code`, {
     method: 'POST',
   });
 };
 
 export const inviteStudents = async (classId: string, emails: string[]) => {
-  return request<{ success: boolean; count: number }>(`/admin/classrooms/${classId}/students/invite`, {
+  return request<{ success: boolean; count: number }>(`/api/v1/admin/classrooms/${classId}/students/invite`, {
     method: 'POST',
     body: { emails },
   });
@@ -272,7 +272,7 @@ export interface AuthResponse {
 }
 
 export const login = async (payload: { email: string; password: string }) => {
-  return request<AuthResponse>('/auth/login', {
+  return request<AuthResponse>('/api/v1/auth/login', {
     method: 'POST',
     body: payload,
     auth: false,
