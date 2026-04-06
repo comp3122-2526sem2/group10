@@ -25,6 +25,7 @@ from . import textbook_service
 bootstrap()
 
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+print(f"CORS allowed origin: {FRONTEND_ORIGIN}")
 
 app = FastAPI(title="Debunk AI API", version="1.0.0")
 app.add_middleware(
@@ -1210,7 +1211,7 @@ def create_task_from_textbook(
             title=payload.title,
             subject=payload.subject,
             source_text=chapter_text,
-            error_density=payload.hallucination_density,
+            error_density=payload.error_density,
         )
         result = ensure_valid_generation(raw_result, payload.hallucination_density)
         content_html = build_content_html(result["paragraphs"], result["highlights"])
