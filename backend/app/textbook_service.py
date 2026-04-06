@@ -7,7 +7,7 @@ import random
 import re
 
 from .db import get_connection, utc_now
-from .pdf_professor import extract_text_from_pdf, detect_chapters, extract_chapter_text
+from .pdf_processor import extract_text_from_pdf, detect_chapters, extract_chapter_text
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 UPLOAD_DIR = os.path.join(BASE_DIR, "backend", "uploads", "textbooks")
